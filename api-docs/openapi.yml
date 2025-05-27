@@ -1,0 +1,1092 @@
+openapi: 3.0.0
+info:
+  title: Stock API
+  description: API para gestionar almacenes, ubicaciones y stock
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Servidor de producción
+paths:
+  # Locations
+  /locations:
+    get:
+      summary: Lista ubicaciones
+      description: Obtiene una lista de ubicaciones basada en criterios de filtrado
+      operationId: listLocations
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filtrar por nombre
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Filtrar por código
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado activo/inactivo
+      responses:
+        '200':
+          description: Lista de ubicaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Crea una ubicación
+      description: Crea una nueva ubicación
+      operationId: createLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+              properties:
+                name:
+                  type: string
+                  description: Nombre de la ubicación
+                  example: "Barcelona"
+                code:
+                  type: string
+                  description: Código de la ubicación
+                  example: "BCN"
+      responses:
+        '201':
+          description: Ubicación creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /locations/{id}:
+    get:
+      summary: Obtiene una ubicación
+      description: Obtiene una ubicación por su ID
+      operationId: getLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación
+      responses:
+        '200':
+          description: Ubicación encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: Actualiza una ubicación
+      description: Actualiza una ubicación existente
+      operationId: updateLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+              properties:
+                name:
+                  type: string
+                  description: Nombre de la ubicación
+                  example: "Barcelona Updated"
+                code:
+                  type: string
+                  description: Código de la ubicación
+                  example: "BCN-UPD"
+      responses:
+        '200':
+          description: Ubicación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Elimina una ubicación
+      description: Elimina una ubicación existente
+      operationId: deleteLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación
+      responses:
+        '204':
+          description: Ubicación eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /locations/{id}/activate:
+    put:
+      summary: Activa una ubicación
+      description: Activa una ubicación existente
+      operationId: activateLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación
+      responses:
+        '200':
+          description: Ubicación activada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /locations/{id}/deactivate:
+    put:
+      summary: Desactiva una ubicación
+      description: Desactiva una ubicación existente
+      operationId: deactivateLocation
+      tags:
+        - Locations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación
+      responses:
+        '200':
+          description: Ubicación desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  
+  # Warehouses
+  /warehouses:
+    get:
+      summary: Lista almacenes
+      description: Obtiene una lista de almacenes basada en criterios de filtrado
+      operationId: listWarehouses
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filtrar por nombre
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Filtrar por código
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado activo/inactivo
+        - name: location_id
+          in: query
+          schema:
+            type: string
+          description: Filtrar por ID de ubicación
+      responses:
+        '200':
+          description: Lista de almacenes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  warehouses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Warehouse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Crea un almacén
+      description: Crea un nuevo almacén
+      operationId: createWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+                - location_id
+              properties:
+                name:
+                  type: string
+                  description: Nombre del almacén
+                  example: "Almacén Central"
+                code:
+                  type: string
+                  description: Código del almacén
+                  example: "ALM-001"
+                location_id:
+                  type: string
+                  description: ID de la ubicación
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '201':
+          description: Almacén creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /warehouses/{id}:
+    get:
+      summary: Obtiene un almacén
+      description: Obtiene un almacén por su ID
+      operationId: getWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del almacén
+      responses:
+        '200':
+          description: Almacén encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: Actualiza un almacén
+      description: Actualiza un almacén existente
+      operationId: updateWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del almacén
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+                - location_id
+              properties:
+                name:
+                  type: string
+                  description: Nombre del almacén
+                  example: "Almacén Central Actualizado"
+                code:
+                  type: string
+                  description: Código del almacén
+                  example: "ALM-001-UPD"
+                location_id:
+                  type: string
+                  description: ID de la ubicación
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: Almacén actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Elimina un almacén
+      description: Elimina un almacén existente
+      operationId: deleteWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del almacén
+      responses:
+        '204':
+          description: Almacén eliminado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /warehouses/{id}/activate:
+    put:
+      summary: Activa un almacén
+      description: Activa un almacén existente
+      operationId: activateWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del almacén
+      responses:
+        '200':
+          description: Almacén activado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /warehouses/{id}/deactivate:
+    put:
+      summary: Desactiva un almacén
+      description: Desactiva un almacén existente
+      operationId: deactivateWarehouse
+      tags:
+        - Warehouses
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del almacén
+      responses:
+        '200':
+          description: Almacén desactivado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  # Stock Locations
+  /stock-locations:
+    get:
+      summary: Lista ubicaciones de stock
+      description: Obtiene una lista de ubicaciones de stock basada en criterios de filtrado
+      operationId: listStockLocations
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: warehouse_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Filtrar por ID de almacén
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filtrar por nombre
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Filtrar por código
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado activo/inactivo
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+          description: Filtrar por ID de ubicación de stock padre
+      responses:
+        '200':
+          description: Lista de ubicaciones de stock
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stock_locations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StockLocation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Crea una ubicación de stock
+      description: Crea una nueva ubicación de stock
+      operationId: createStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+                - warehouse_id
+              properties:
+                name:
+                  type: string
+                  description: Nombre de la ubicación de stock
+                  example: "Estantería A1"
+                code:
+                  type: string
+                  description: Código de la ubicación de stock
+                  example: "EST-A1"
+                warehouse_id:
+                  type: string
+                  description: ID del almacén
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                parent_id:
+                  type: string
+                  description: ID de la ubicación de stock padre (opcional)
+                  example: "123e4567-e89b-12d3-a456-426614174001"
+      responses:
+        '201':
+          description: Ubicación de stock creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLocation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /stock-locations/{id}:
+    get:
+      summary: Obtiene una ubicación de stock
+      description: Obtiene una ubicación de stock por su ID
+      operationId: getStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación de stock
+      responses:
+        '200':
+          description: Ubicación de stock encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLocation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: Actualiza una ubicación de stock
+      description: Actualiza una ubicación de stock existente
+      operationId: updateStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación de stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+                - warehouse_id
+              properties:
+                name:
+                  type: string
+                  description: Nombre de la ubicación de stock
+                  example: "Estantería A1 Actualizada"
+                code:
+                  type: string
+                  description: Código de la ubicación de stock
+                  example: "EST-A1-UPD"
+                warehouse_id:
+                  type: string
+                  description: ID del almacén
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                parent_id:
+                  type: string
+                  description: ID de la ubicación de stock padre (opcional)
+                  example: "123e4567-e89b-12d3-a456-426614174001"
+      responses:
+        '200':
+          description: Ubicación de stock actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLocation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Elimina una ubicación de stock
+      description: Elimina una ubicación de stock existente
+      operationId: deleteStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación de stock
+      responses:
+        '204':
+          description: Ubicación de stock eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /stock-locations/{id}/activate:
+    put:
+      summary: Activa una ubicación de stock
+      description: Activa una ubicación de stock existente
+      operationId: activateStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación de stock
+      responses:
+        '200':
+          description: Ubicación de stock activada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLocation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /stock-locations/{id}/deactivate:
+    put:
+      summary: Desactiva una ubicación de stock
+      description: Desactiva una ubicación de stock existente
+      operationId: deactivateStockLocation
+      tags:
+        - StockLocations
+      parameters:
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: ID del tenant
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la ubicación de stock
+      responses:
+        '200':
+          description: Ubicación de stock desactivada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLocation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  schemas:
+    Location:
+      type: object
+      required:
+        - id
+        - name
+        - code
+        - tenant_id
+        - active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único de la ubicación
+        name:
+          type: string
+          description: Nombre de la ubicación
+        code:
+          type: string
+          description: Código de la ubicación
+        tenant_id:
+          type: string
+          description: ID del tenant
+        active:
+          type: boolean
+          description: Indica si la ubicación está activa
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación
+        updated_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de última actualización
+    Warehouse:
+      type: object
+      required:
+        - id
+        - name
+        - code
+        - tenant_id
+        - location_id
+        - active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único del almacén
+        name:
+          type: string
+          description: Nombre del almacén
+        code:
+          type: string
+          description: Código del almacén
+        tenant_id:
+          type: string
+          description: ID del tenant
+        location_id:
+          type: string
+          format: uuid
+          description: ID de la ubicación
+        active:
+          type: boolean
+          description: Indica si el almacén está activo
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación
+        updated_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de última actualización
+    StockLocation:
+      type: object
+      required:
+        - id
+        - name
+        - code
+        - tenant_id
+        - warehouse_id
+        - active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único de la ubicación de stock
+        name:
+          type: string
+          description: Nombre de la ubicación de stock
+        code:
+          type: string
+          description: Código de la ubicación de stock
+        tenant_id:
+          type: string
+          description: ID del tenant
+        warehouse_id:
+          type: string
+          format: uuid
+          description: ID del almacén
+        parent_id:
+          type: string
+          format: uuid
+          description: ID de la ubicación de stock padre (opcional)
+        path:
+          type: string
+          description: Ruta jerárquica de la ubicación de stock
+        active:
+          type: boolean
+          description: Indica si la ubicación de stock está activa
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación
+        updated_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de última actualización
+  responses:
+    BadRequest:
+      description: Solicitud incorrecta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: No autorizado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Prohibido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Conflicto
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalServerError:
+      description: Error del servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Código de error
+        message:
+          type: string
+          description: Mensaje de error
+        details:
+          type: object
+          description: Detalles adicionales del error
