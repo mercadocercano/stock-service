@@ -1,160 +1,175 @@
 package criteria
 
 import (
-	"strconv"
-	"strings"
+	"net/url"
 
-	"stock/src/shared/domain/criteria"
+	domainCriteria "stock/src/shared/domain/criteria"
+	sharedCriteria "stock/src/shared/infrastructure/criteria"
 
 	"github.com/gin-gonic/gin"
 )
 
-// StockLocationCriteriaBuilder construye criterios para buscar ubicaciones de stock
+// StockLocationCriteriaBuilder construye criterios específicos para ubicaciones de stock
 type StockLocationCriteriaBuilder struct {
-	filters    []criteria.Filter
-	orderField string
-	orderDir   criteria.OrderType
-	limit      *int
-	offset     *int
-	warehouse  string
-	parent     string
+	*domainCriteria.CriteriaBuilder
+	helper *sharedCriteria.EntityCriteriaHelper
 }
 
-// NewStockLocationCriteriaBuilder crea un nuevo builder de criterios
+// NewStockLocationCriteriaBuilder crea un nuevo builder para criterios de ubicaciones de stock
 func NewStockLocationCriteriaBuilder() *StockLocationCriteriaBuilder {
 	return &StockLocationCriteriaBuilder{
-		filters:    make([]criteria.Filter, 0),
-		orderField: "name",
-		orderDir:   criteria.ASC,
+		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
+		helper:          sharedCriteria.NewEntityCriteriaHelper(),
 	}
 }
 
-// FromContext obtiene los parámetros de la petición HTTP para construir el criterio
-func (b *StockLocationCriteriaBuilder) FromContext(c *gin.Context) *StockLocationCriteriaBuilder {
-	// Paginación
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "10")
+// BuildFromContext construye criterios desde el contexto de Gin con filtros específicos de ubicaciones de stock
+func (b *StockLocationCriteriaBuilder) BuildFromContext(c *gin.Context) *StockLocationCriteriaBuilder {
+	// Construir criterios base desde query parameters
+	b.CriteriaBuilder = b.helper.BuildBaseFromContext(c)
 
-	page, _ := strconv.Atoi(pageStr)
-	pageSize, _ := strconv.Atoi(pageSizeStr)
-
-	if page < 1 {
-		page = 1
-	}
-
-	if pageSize < 1 {
-		pageSize = 10
-	}
-
-	if pageSize > 100 {
-		pageSize = 100
-	}
-
-	offset := (page - 1) * pageSize
-	limit := pageSize
-
-	b.limit = &limit
-	b.offset = &offset
-
-	// Ordenamiento
-	orderField := c.DefaultQuery("order_by", "name")
-	orderType := c.DefaultQuery("order_type", "asc")
-
-	if orderField != "" {
-		b.orderField = orderField
-	}
-
-	if strings.ToLower(orderType) == "desc" {
-		b.orderDir = criteria.DESC
-	} else {
-		b.orderDir = criteria.ASC
-	}
-
-	// Filtros específicos
-	b.AddNameFilter(c.Query("name"))
-	b.AddCodeFilter(c.Query("code"))
-	b.AddActiveFilter(c.Query("active"))
-
-	// Filtros por almacén y padre
-	warehouse := c.Query("warehouse_id")
-	if warehouse != "" {
-		b.AddWarehouseFilter(warehouse)
-		b.warehouse = warehouse
-	}
-
-	parent := c.Query("parent_id")
-	if parent != "" {
-		b.AddParentFilter(parent)
-		b.parent = parent
-	}
+	// Agregar filtros específicos de ubicaciones de stock
+	b.addStockLocationFilters(c.Request.URL.Query())
 
 	return b
 }
 
-// Build construye el criterio final
-func (b *StockLocationCriteriaBuilder) Build() criteria.Criteria {
-	filters := criteria.NewFilters(b.filters...)
-	order := criteria.NewOrder(b.orderField, b.orderDir)
-
-	return criteria.NewCriteria(filters, order, b.limit, b.offset)
+// BuildValidated construye y valida criterios desde el contexto
+func (b *StockLocationCriteriaBuilder) BuildValidated(c *gin.Context) domainCriteria.Criteria {
+	criteria := b.BuildFromContext(c).Build()
+	return b.helper.ValidateAndSanitizeCriteria(criteria, b.GetAllowedFields())
 }
 
-// BuildValidated construye el criterio con validación
-func (b *StockLocationCriteriaBuilder) BuildValidated(c *gin.Context) criteria.Criteria {
-	return b.FromContext(c).Build()
+// addStockLocationFilters agrega filtros específicos de ubicaciones de stock
+func (b *StockLocationCriteriaBuilder) addStockLocationFilters(values url.Values) {
+	// Filtro por tenant_id (obligatorio)
+	if tenantID := values.Get("tenant_id"); tenantID != "" {
+		b.AddUUIDFilter("tenant_id", tenantID)
+	}
+
+	// Filtros de búsqueda por texto
+	if name := values.Get("name"); name != "" {
+		b.AddLikeFilter("name", name)
+	}
+
+	if code := values.Get("code"); code != "" {
+		b.AddLikeFilter("code", code)
+	}
+
+	if description := values.Get("description"); description != "" {
+		b.AddLikeFilter("description", description)
+	}
+
+	// Filtros por relaciones
+	if warehouseID := values.Get("warehouse_id"); warehouseID != "" {
+		b.AddUUIDFilter("warehouse_id", warehouseID)
+	}
+
+	if parentID := values.Get("parent_id"); parentID != "" {
+		b.AddUUIDFilter("parent_id", parentID)
+	}
+
+	// Filtros exactos
+	if locationType := values.Get("type"); locationType != "" {
+		b.AddEqualFilter("type", locationType)
+	}
+
+	// Filtros booleanos
+	if active := values.Get("active"); active != "" {
+		b.AddBoolFilter("active", active)
+	}
+
+	// Filtros especiales
+	if activeOnly := values.Get("active_only"); activeOnly == "true" {
+		b.AddEqualFilter("active", true)
+	}
+
+	// Filtro por capacidad
+	if minCapacity := values.Get("min_capacity"); minCapacity != "" {
+		b.AddFilter("capacity", domainCriteria.OpGreaterThanOrEqual, minCapacity)
+	}
+
+	if maxCapacity := values.Get("max_capacity"); maxCapacity != "" {
+		b.AddFilter("capacity", domainCriteria.OpLessThanOrEqual, maxCapacity)
+	}
 }
 
-// GetWarehouseID devuelve el ID del almacén si se ha especificado
-func (b *StockLocationCriteriaBuilder) GetWarehouseID() string {
-	return b.warehouse
+// GetAllowedFields retorna los campos permitidos para filtrado y ordenamiento
+func (b *StockLocationCriteriaBuilder) GetAllowedFields() []string {
+	return []string{
+		"id",
+		"tenant_id",
+		"warehouse_id",
+		"parent_id",
+		"name",
+		"code",
+		"type",
+		"description",
+		"capacity",
+		"active",
+		"created_at",
+		"updated_at",
+	}
 }
 
-// GetParentID devuelve el ID del padre si se ha especificado
-func (b *StockLocationCriteriaBuilder) GetParentID() string {
-	return b.parent
+// GetDefaultSortField retorna el campo de ordenamiento por defecto
+func (b *StockLocationCriteriaBuilder) GetDefaultSortField() string {
+	return "name"
+}
+
+// GetDefaultSortDirection retorna la dirección de ordenamiento por defecto
+func (b *StockLocationCriteriaBuilder) GetDefaultSortDirection() domainCriteria.OrderType {
+	return domainCriteria.ASC
 }
 
 // Métodos de filtrado específicos
 
-// AddNameFilter añade un filtro por nombre
 func (b *StockLocationCriteriaBuilder) AddNameFilter(name string) *StockLocationCriteriaBuilder {
 	if name != "" {
-		b.filters = append(b.filters, criteria.NewFilter("name", "LIKE", "%"+name+"%"))
+		b.AddLikeFilter("name", name)
 	}
 	return b
 }
 
-// AddCodeFilter añade un filtro por código
 func (b *StockLocationCriteriaBuilder) AddCodeFilter(code string) *StockLocationCriteriaBuilder {
 	if code != "" {
-		b.filters = append(b.filters, criteria.NewFilter("code", "LIKE", "%"+code+"%"))
+		b.AddLikeFilter("code", code)
 	}
 	return b
 }
 
-// AddActiveFilter añade un filtro por estado
 func (b *StockLocationCriteriaBuilder) AddActiveFilter(active string) *StockLocationCriteriaBuilder {
 	if active != "" {
-		isActive := active == "true"
-		b.filters = append(b.filters, criteria.NewFilter("active", "=", isActive))
+		b.AddBoolFilter("active", active)
 	}
 	return b
 }
 
-// AddWarehouseFilter añade un filtro por almacén
 func (b *StockLocationCriteriaBuilder) AddWarehouseFilter(warehouseID string) *StockLocationCriteriaBuilder {
 	if warehouseID != "" {
-		b.filters = append(b.filters, criteria.NewFilter("warehouse_id", "=", warehouseID))
-		b.warehouse = warehouseID
+		b.AddUUIDFilter("warehouse_id", warehouseID)
 	}
 	return b
 }
 
-// AddParentFilter añade un filtro por padre
 func (b *StockLocationCriteriaBuilder) AddParentFilter(parentID string) *StockLocationCriteriaBuilder {
 	if parentID != "" {
-		b.filters = append(b.filters, criteria.NewFilter("parent_id", "=", parentID))
-		b.parent = parentID
+		b.AddUUIDFilter("parent_id", parentID)
 	}
+	return b
+}
+
+// FromURLValues inicializa el builder desde url.Values
+func (b *StockLocationCriteriaBuilder) FromURLValues(values url.Values) *StockLocationCriteriaBuilder {
+	// Construir criterios base
+	b.CriteriaBuilder = b.CriteriaBuilder.FromURLValues(values)
+
+	// Filtros específicos
+	b.AddNameFilter(values.Get("name"))
+	b.AddCodeFilter(values.Get("code"))
+	b.AddActiveFilter(values.Get("active"))
+	b.AddWarehouseFilter(values.Get("warehouse_id"))
+	b.AddParentFilter(values.Get("parent_id"))
+
 	return b
 }

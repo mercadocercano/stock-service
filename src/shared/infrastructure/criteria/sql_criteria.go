@@ -38,8 +38,8 @@ func (s *SQLCriteriaConverter) ToSelectSQL(baseQuery string, criteria domainCrit
 	}
 
 	// Agregar LIMIT y OFFSET clause si hay paginación
-	if !criteria.Pagination.IsEmpty() {
-		limitClause := s.buildLimitClause(criteria.Pagination)
+	if criteria.Limit != nil && criteria.Offset != nil {
+		limitClause := s.buildLimitClause(criteria.Limit, criteria.Offset)
 		parts = append(parts, limitClause)
 	}
 
@@ -91,13 +91,13 @@ func (s *SQLCriteriaConverter) ToSQL(criteria domainCriteria.Criteria) (string, 
 	// Construir la cláusula ORDER BY
 	var orderByClause string
 	if !criteria.Order.IsEmpty() {
-		orderByClause = fmt.Sprintf("ORDER BY %s %s", criteria.Order.Field, criteria.Order.Direction)
+		orderByClause = fmt.Sprintf("ORDER BY %s %s", criteria.Order.Field, string(criteria.Order.OrderType))
 	}
 
 	// Construir la cláusula LIMIT y OFFSET
 	var limitOffsetClause string
-	if !criteria.Pagination.IsEmpty() {
-		limitOffsetClause = fmt.Sprintf("LIMIT %d OFFSET %d", criteria.Pagination.Limit, criteria.Pagination.Offset)
+	if criteria.Limit != nil && criteria.Offset != nil {
+		limitOffsetClause = fmt.Sprintf("LIMIT %d OFFSET %d", *criteria.Limit, *criteria.Offset)
 	}
 
 	// Combinar las cláusulas
@@ -136,12 +136,12 @@ func (s *SQLCriteriaConverter) buildWhereClause(filters domainCriteria.Filters) 
 
 // buildOrderClause construye la cláusula ORDER BY
 func (s *SQLCriteriaConverter) buildOrderClause(order domainCriteria.Order) string {
-	return fmt.Sprintf("ORDER BY %s %s", order.Field, order.Direction)
+	return fmt.Sprintf("ORDER BY %s %s", order.Field, string(order.OrderType))
 }
 
 // buildLimitClause construye la cláusula LIMIT y OFFSET
-func (s *SQLCriteriaConverter) buildLimitClause(pagination domainCriteria.Pagination) string {
-	return fmt.Sprintf("LIMIT %d OFFSET %d", pagination.Limit, pagination.Offset)
+func (s *SQLCriteriaConverter) buildLimitClause(limit, offset *int) string {
+	return fmt.Sprintf("LIMIT %d OFFSET %d", *limit, *offset)
 }
 
 // processFilterWithIndex convierte un filtro en una condición SQL con índice de parámetro
@@ -170,6 +170,9 @@ func (s *SQLCriteriaConverter) processFilterWithIndex(filter domainCriteria.Filt
 	case domainCriteria.OpIsNotNull:
 		condition = fmt.Sprintf("%s IS NOT NULL", filter.Field)
 		return condition, nil
+	case domainCriteria.OpArrayContains:
+		// PostgreSQL: para verificar si un array contiene un valor específico
+		condition = fmt.Sprintf("%s @> ARRAY[%s]", filter.Field, placeholder)
 	default:
 		condition = fmt.Sprintf("%s = %s", filter.Field, placeholder)
 	}
@@ -201,6 +204,9 @@ func (s *SQLCriteriaConverter) processFilter(filter domainCriteria.Filter) (stri
 	case "NOT NULL":
 		condition = fmt.Sprintf("%s IS NOT NULL", filter.Field)
 		return condition, nil
+	case "ARRAY_CONTAINS":
+		// PostgreSQL: para verificar si un array contiene un valor específico
+		condition = fmt.Sprintf("%s @> ARRAY[$?]", filter.Field)
 	default:
 		condition = fmt.Sprintf("%s = $?", filter.Field)
 	}

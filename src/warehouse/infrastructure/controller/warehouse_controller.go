@@ -101,19 +101,29 @@ func (c *WarehouseController) CreateWarehouse(ctx *gin.Context) {
 
 // ListWarehouses maneja la petición para listar almacenes con filtros y paginación
 func (c *WarehouseController) ListWarehouses(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
+
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
 
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewWarehouseCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar almacenes
-	response, err := c.listWarehousesUseCase.Execute(ctx, tenantID.(string), crit)
+	response, err := c.listWarehousesUseCase.Execute(ctx, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -202,11 +212,16 @@ func (c *WarehouseController) UpdateWarehouse(ctx *gin.Context) {
 
 // ListWarehousesByLocation maneja la petición para listar almacenes por ubicación
 func (c *WarehouseController) ListWarehousesByLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
@@ -216,12 +231,17 @@ func (c *WarehouseController) ListWarehousesByLocation(ctx *gin.Context) {
 		return
 	}
 
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
+
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewWarehouseCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar almacenes por ubicación
-	response, err := c.listWarehousesUseCase.ExecuteByLocationID(ctx, locationID, tenantID.(string), crit)
+	response, err := c.listWarehousesUseCase.ExecuteByLocationID(ctx, locationID, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {

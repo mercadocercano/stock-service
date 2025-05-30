@@ -20,6 +20,7 @@ const (
 	OpIn                 = "IN"
 	OpIsNull             = "NULL"
 	OpIsNotNull          = "NOT NULL"
+	OpArrayContains      = "ARRAY_CONTAINS"
 )
 
 // BaseListRequest representa la estructura base para requests de listado
@@ -234,4 +235,12 @@ func (b *CriteriaBuilder) Build() Criteria {
 	offset := (b.page - 1) * b.pageSize
 
 	return NewCriteria(filters, order, &limit, &offset)
+}
+
+// AddArrayContainsFilter agrega un filtro para verificar si un array contiene un valor específico
+func (b *CriteriaBuilder) AddArrayContainsFilter(field string, value interface{}) *CriteriaBuilder {
+	if value != nil && value != "" {
+		return b.AddFilter(field, OpArrayContains, value)
+	}
+	return b
 }

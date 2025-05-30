@@ -2,94 +2,90 @@ package criteria
 
 import (
 	"net/url"
-	"strconv"
-	"strings"
+
+	domainCriteria "stock/src/shared/domain/criteria"
+	sharedCriteria "stock/src/shared/infrastructure/criteria"
 
 	"github.com/gin-gonic/gin"
-
-	"stock/src/shared/domain/criteria"
 )
 
 // LocationCriteriaBuilder construye criterios específicos para ubicaciones
 type LocationCriteriaBuilder struct {
-	filters    []criteria.Filter
-	orderField string
-	orderDir   criteria.OrderType
-	limit      *int
-	offset     *int
+	*domainCriteria.CriteriaBuilder
+	helper *sharedCriteria.EntityCriteriaHelper
 }
 
-// NewLocationCriteriaBuilder crea una nueva instancia del builder
+// NewLocationCriteriaBuilder crea un nuevo builder para criterios de ubicaciones
 func NewLocationCriteriaBuilder() *LocationCriteriaBuilder {
 	return &LocationCriteriaBuilder{
-		filters:    make([]criteria.Filter, 0),
-		orderField: "created_at",
-		orderDir:   criteria.DESC,
+		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
+		helper:          sharedCriteria.NewEntityCriteriaHelper(),
 	}
 }
 
-// FromContext construye criterios desde el contexto de Gin
-func (b *LocationCriteriaBuilder) FromContext(c *gin.Context) *LocationCriteriaBuilder {
-	// Paginación
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "10")
+// BuildFromContext construye criterios desde el contexto de Gin con filtros específicos de ubicaciones
+func (b *LocationCriteriaBuilder) BuildFromContext(c *gin.Context) *LocationCriteriaBuilder {
+	// Construir criterios base desde query parameters
+	b.CriteriaBuilder = b.helper.BuildBaseFromContext(c)
 
-	page, _ := strconv.Atoi(pageStr)
-	pageSize, _ := strconv.Atoi(pageSizeStr)
-
-	if page < 1 {
-		page = 1
-	}
-
-	if pageSize < 1 {
-		pageSize = 10
-	}
-
-	if pageSize > 100 {
-		pageSize = 100
-	}
-
-	offset := (page - 1) * pageSize
-	limit := pageSize
-
-	b.limit = &limit
-	b.offset = &offset
-
-	// Ordenamiento
-	orderField := c.DefaultQuery("order_by", "created_at")
-	orderType := c.DefaultQuery("order_type", "desc")
-
-	if orderField != "" {
-		b.orderField = orderField
-	}
-
-	if strings.ToLower(orderType) == "asc" {
-		b.orderDir = criteria.ASC
-	} else {
-		b.orderDir = criteria.DESC
-	}
-
-	// Filtros específicos de ubicaciones
-	b.AddNameFilter(c.Query("name"))
-	b.AddTypeFilter(c.Query("type"))
-	b.AddCityFilter(c.Query("city"))
-	b.AddCountryFilter(c.Query("country"))
-	b.AddActiveFilter(c.Query("active"))
+	// Agregar filtros específicos de ubicaciones
+	b.addLocationFilters(c.Request.URL.Query())
 
 	return b
 }
 
-// BuildValidated construye y valida los criterios
-func (b *LocationCriteriaBuilder) BuildValidated(c *gin.Context) criteria.Criteria {
-	return b.FromContext(c).Build()
+// BuildValidated construye y valida criterios desde el contexto
+func (b *LocationCriteriaBuilder) BuildValidated(c *gin.Context) domainCriteria.Criteria {
+	criteria := b.BuildFromContext(c).Build()
+	return b.helper.ValidateAndSanitizeCriteria(criteria, b.GetAllowedFields())
 }
 
-// Build construye los criterios sin validación adicional
-func (b *LocationCriteriaBuilder) Build() criteria.Criteria {
-	filters := criteria.NewFilters(b.filters...)
-	order := criteria.NewOrder(b.orderField, b.orderDir)
+// addLocationFilters agrega filtros específicos de ubicaciones
+func (b *LocationCriteriaBuilder) addLocationFilters(values url.Values) {
+	// Filtro por tenant_id (obligatorio)
+	if tenantID := values.Get("tenant_id"); tenantID != "" {
+		b.AddUUIDFilter("tenant_id", tenantID)
+	}
 
-	return criteria.NewCriteria(filters, order, b.limit, b.offset)
+	// Filtros de búsqueda por texto
+	if name := values.Get("name"); name != "" {
+		b.AddLikeFilter("name", name)
+	}
+
+	if address := values.Get("address"); address != "" {
+		b.AddLikeFilter("address", address)
+	}
+
+	if city := values.Get("city"); city != "" {
+		b.AddLikeFilter("city", city)
+	}
+
+	if state := values.Get("state"); state != "" {
+		b.AddLikeFilter("state", state)
+	}
+
+	// Filtros exactos
+	if locationType := values.Get("type"); locationType != "" {
+		b.AddEqualFilter("type", locationType)
+	}
+
+	if country := values.Get("country"); country != "" {
+		b.AddEqualFilter("country", country)
+	}
+
+	if postalCode := values.Get("postal_code"); postalCode != "" {
+		b.AddEqualFilter("postal_code", postalCode)
+	}
+
+	// Filtros booleanos
+	if active := values.Get("active"); active != "" {
+		b.AddBoolFilter("active", active)
+	}
+
+	// Filtros especiales
+	if activeOnly := values.Get("active_only"); activeOnly == "true" {
+		b.AddEqualFilter("active", true)
+	}
 }
 
 // GetAllowedFields retorna los campos permitidos para filtrado y ordenamiento
@@ -116,82 +112,53 @@ func (b *LocationCriteriaBuilder) GetDefaultSortField() string {
 }
 
 // GetDefaultSortDirection retorna la dirección de ordenamiento por defecto
-func (b *LocationCriteriaBuilder) GetDefaultSortDirection() criteria.OrderType {
-	return criteria.DESC
+func (b *LocationCriteriaBuilder) GetDefaultSortDirection() domainCriteria.OrderType {
+	return domainCriteria.DESC
 }
 
 // Métodos de filtrado específicos
 
 func (b *LocationCriteriaBuilder) AddNameFilter(name string) *LocationCriteriaBuilder {
 	if name != "" {
-		b.filters = append(b.filters, criteria.NewFilter("name", "LIKE", "%"+name+"%"))
+		b.AddLikeFilter("name", name)
 	}
 	return b
 }
 
 func (b *LocationCriteriaBuilder) AddTypeFilter(locationType string) *LocationCriteriaBuilder {
 	if locationType != "" {
-		b.filters = append(b.filters, criteria.NewFilter("type", "=", locationType))
+		b.AddEqualFilter("type", locationType)
 	}
 	return b
 }
 
 func (b *LocationCriteriaBuilder) AddCityFilter(city string) *LocationCriteriaBuilder {
 	if city != "" {
-		b.filters = append(b.filters, criteria.NewFilter("city", "LIKE", "%"+city+"%"))
+		b.AddLikeFilter("city", city)
 	}
 	return b
 }
 
 func (b *LocationCriteriaBuilder) AddCountryFilter(country string) *LocationCriteriaBuilder {
 	if country != "" {
-		b.filters = append(b.filters, criteria.NewFilter("country", "=", country))
+		b.AddEqualFilter("country", country)
 	}
 	return b
 }
 
 func (b *LocationCriteriaBuilder) AddActiveFilter(active string) *LocationCriteriaBuilder {
 	if active != "" {
-		isActive := active == "true"
-		b.filters = append(b.filters, criteria.NewFilter("active", "=", isActive))
+		b.AddBoolFilter("active", active)
 	}
 	return b
 }
 
 // FromURLValues inicializa el builder desde url.Values
 func (b *LocationCriteriaBuilder) FromURLValues(values url.Values) *LocationCriteriaBuilder {
-	// Paginación
-	if page := values.Get("page"); page != "" {
-		if p, err := strconv.Atoi(page); err == nil && p > 0 {
-			pageSize := 10
-			if pageSizeStr := values.Get("page_size"); pageSizeStr != "" {
-				if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
-					pageSize = ps
-				}
-			}
+	// Construir criterios base
+	b.CriteriaBuilder = b.CriteriaBuilder.FromURLValues(values)
 
-			offset := (p - 1) * pageSize
-			limit := pageSize
-
-			b.limit = &limit
-			b.offset = &offset
-		}
-	}
-
-	// Ordenamiento
-	if sortBy := values.Get("order_by"); sortBy != "" {
-		b.orderField = sortBy
-	}
-
-	if sortDir := values.Get("order_type"); sortDir != "" {
-		if strings.ToLower(sortDir) == "asc" {
-			b.orderDir = criteria.ASC
-		} else {
-			b.orderDir = criteria.DESC
-		}
-	}
-
-	// Filtros
+	// Filtros específicos
 	b.AddNameFilter(values.Get("name"))
 	b.AddTypeFilter(values.Get("type"))
 	b.AddCityFilter(values.Get("city"))

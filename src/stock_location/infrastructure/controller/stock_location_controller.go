@@ -105,19 +105,29 @@ func (c *StockLocationController) CreateStockLocation(ctx *gin.Context) {
 
 // ListStockLocations maneja la petición para listar ubicaciones de stock con filtros y paginación
 func (c *StockLocationController) ListStockLocations(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
+
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
 
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewStockLocationCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar ubicaciones de stock
-	response, err := c.listStockLocationsUseCase.Execute(ctx, tenantID.(string), crit)
+	response, err := c.listStockLocationsUseCase.Execute(ctx, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -308,11 +318,16 @@ func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
 
 // ListStockLocationsByWarehouse maneja la petición para listar ubicaciones de stock por almacén
 func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
 
 	// Obtener el ID del almacén de los parámetros de la URL
@@ -322,12 +337,17 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 		return
 	}
 
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
+
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewStockLocationCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar ubicaciones de stock por almacén
-	response, err := c.listStockLocationsUseCase.ExecuteByWarehouseID(ctx, warehouseID, tenantID.(string), crit)
+	response, err := c.listStockLocationsUseCase.ExecuteByWarehouseID(ctx, warehouseID, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -341,11 +361,16 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 
 // ListRootStockLocations maneja la petición para listar ubicaciones de stock raíz por almacén
 func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
 
 	// Obtener el ID del almacén de los parámetros de la URL
@@ -355,12 +380,17 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 		return
 	}
 
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
+
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewStockLocationCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar ubicaciones de stock raíz por almacén
-	response, err := c.listStockLocationsUseCase.ExecuteRoots(ctx, warehouseID, tenantID.(string), crit)
+	response, err := c.listStockLocationsUseCase.ExecuteRoots(ctx, warehouseID, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -374,11 +404,16 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 
 // ListChildrenStockLocations maneja la petición para listar ubicaciones de stock hijas
 func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
 
 	// Obtener el ID de la ubicación padre de los parámetros de la URL
@@ -388,12 +423,17 @@ func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
 		return
 	}
 
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
+
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewStockLocationCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar ubicaciones de stock hijas
-	response, err := c.listStockLocationsUseCase.ExecuteChildren(ctx, parentID, tenantID.(string), crit)
+	response, err := c.listStockLocationsUseCase.ExecuteChildren(ctx, parentID, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {

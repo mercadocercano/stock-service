@@ -49,10 +49,10 @@ func (h *ControllerHelper) ValidateAndSanitizeCriteria(criteria domainCriteria.C
 	// Validar campo de ordenamiento
 	validOrder := criteria.Order
 	if validOrder.Field != "" && !allowedMap[validOrder.Field] {
-		validOrder = domainCriteria.NewOrder("created_at", "DESC")
+		validOrder = domainCriteria.NewOrder("created_at", domainCriteria.DESC)
 	}
 
-	return domainCriteria.NewCriteria(validFilters, validOrder, criteria.Pagination)
+	return domainCriteria.NewCriteria(validFilters, validOrder, criteria.Limit, criteria.Offset)
 }
 
 // BaseCriteriaBuilder interface que deben implementar los builders específicos de cada módulo

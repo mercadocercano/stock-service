@@ -97,19 +97,29 @@ func (c *LocationController) CreateLocation(ctx *gin.Context) {
 
 // ListLocations maneja la petición para listar ubicaciones con filtros y paginación
 func (c *LocationController) ListLocations(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
+
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
 
 	// Utilizar el criteria builder para construir los criterios desde la petición
 	criteriaBuilder := criteria.NewLocationCriteriaBuilder()
 	crit := criteriaBuilder.BuildValidated(ctx)
 
 	// Ejecutar el caso de uso para listar ubicaciones
-	response, err := c.listLocationsUseCase.Execute(ctx, tenantID.(string), crit)
+	response, err := c.listLocationsUseCase.Execute(ctx, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -300,22 +310,32 @@ func (c *LocationController) DeleteLocation(ctx *gin.Context) {
 
 // ListStores maneja la petición para listar solo ubicaciones de tipo tienda
 func (c *LocationController) ListStores(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
+
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
 
 	// Construir criterios con filtro de tipo = 'store'
 	criteriaBuilder := criteria.NewLocationCriteriaBuilder()
-	criteriaBuilder.FromContext(ctx)
+	criteriaBuilder.BuildFromContext(ctx)
 
 	// Añadir filtro de tipo 'store' (sobrescribe cualquier otro filtro de tipo)
 	crit := criteriaBuilder.AddTypeFilter("store").Build()
 
 	// Ejecutar el caso de uso
-	response, err := c.listLocationsUseCase.Execute(ctx, tenantID.(string), crit)
+	response, err := c.listLocationsUseCase.Execute(ctx, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
@@ -329,22 +349,32 @@ func (c *LocationController) ListStores(ctx *gin.Context) {
 
 // ListDistributionCenters maneja la petición para listar solo centros de distribución
 func (c *LocationController) ListDistributionCenters(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
-		return
+	// Obtener el tenantID del header y agregarlo a los query parameters
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		// Fallback: intentar obtener del contexto (middleware)
+		if tenant, exists := ctx.Get("tenantID"); exists {
+			tenantID = tenant.(string)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			return
+		}
 	}
+
+	// Agregar tenant_id a los query parameters para el filtrado
+	query := ctx.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	ctx.Request.URL.RawQuery = query.Encode()
 
 	// Construir criterios con filtro de tipo = 'distribution_center'
 	criteriaBuilder := criteria.NewLocationCriteriaBuilder()
-	criteriaBuilder.FromContext(ctx)
+	criteriaBuilder.BuildFromContext(ctx)
 
 	// Añadir filtro de tipo 'distribution_center' (sobrescribe cualquier otro filtro de tipo)
 	crit := criteriaBuilder.AddTypeFilter("distribution_center").Build()
 
 	// Ejecutar el caso de uso
-	response, err := c.listLocationsUseCase.Execute(ctx, tenantID.(string), crit)
+	response, err := c.listLocationsUseCase.Execute(ctx, tenantID, crit)
 
 	// Manejar errores
 	if err != nil {
