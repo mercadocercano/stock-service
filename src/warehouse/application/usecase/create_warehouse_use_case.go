@@ -11,11 +11,11 @@ import (
 
 // CreateWarehouseUseCase define el caso de uso para crear un almacén
 type CreateWarehouseUseCase struct {
-	warehouseService *service.WarehouseService
+	warehouseService service.WarehouseServiceInterface
 }
 
 // NewCreateWarehouseUseCase crea una nueva instancia del caso de uso
-func NewCreateWarehouseUseCase(warehouseService *service.WarehouseService) *CreateWarehouseUseCase {
+func NewCreateWarehouseUseCase(warehouseService service.WarehouseServiceInterface) *CreateWarehouseUseCase {
 	return &CreateWarehouseUseCase{
 		warehouseService: warehouseService,
 	}

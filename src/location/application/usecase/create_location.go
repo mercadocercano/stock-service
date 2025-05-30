@@ -11,11 +11,11 @@ import (
 
 // CreateLocationUseCase representa el caso de uso para crear una ubicación
 type CreateLocationUseCase struct {
-	locationService *service.LocationService
+	locationService service.LocationServiceInterface
 }
 
 // NewCreateLocationUseCase crea una nueva instancia del caso de uso
-func NewCreateLocationUseCase(locationService *service.LocationService) *CreateLocationUseCase {
+func NewCreateLocationUseCase(locationService service.LocationServiceInterface) *CreateLocationUseCase {
 	return &CreateLocationUseCase{
 		locationService: locationService,
 	}

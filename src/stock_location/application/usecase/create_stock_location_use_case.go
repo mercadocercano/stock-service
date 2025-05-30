@@ -10,11 +10,11 @@ import (
 
 // CreateStockLocationUseCase define el caso de uso para crear una ubicación de stock
 type CreateStockLocationUseCase struct {
-	stockLocationService *service.StockLocationService
+	stockLocationService service.StockLocationServiceInterface
 }
 
 // NewCreateStockLocationUseCase crea una nueva instancia del caso de uso
-func NewCreateStockLocationUseCase(stockLocationService *service.StockLocationService) *CreateStockLocationUseCase {
+func NewCreateStockLocationUseCase(stockLocationService service.StockLocationServiceInterface) *CreateStockLocationUseCase {
 	return &CreateStockLocationUseCase{
 		stockLocationService: stockLocationService,
 	}
