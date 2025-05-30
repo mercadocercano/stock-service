@@ -39,4 +39,4 @@ func (uc *UpdateLocationUseCase) Execute(ctx context.Context, tenantID string, l
 
 	// Transformar la entidad de dominio en DTO de respuesta
 	return response.NewLocationResponse(location), nil
-} 
+}

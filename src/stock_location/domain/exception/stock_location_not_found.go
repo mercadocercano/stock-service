@@ -11,4 +11,4 @@ type StockLocationNotFound struct {
 // Error devuelve el mensaje de error
 func (e *StockLocationNotFound) Error() string {
 	return fmt.Sprintf("stock location with ID '%s' not found for tenant '%s'", e.ID, e.TenantID)
-} 
+}

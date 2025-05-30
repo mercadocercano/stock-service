@@ -158,3 +158,4 @@ func setupStockLocationModule(router *gin.RouterGroup, db *sql.DB) {
 	log.Println("  DELETE /api/v1/stock-locations/:id")
 	log.Println("  GET    /api/v1/warehouses/:warehouse_id/stock-locations")
 }
+// Test change for git hook

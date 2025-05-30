@@ -44,4 +44,4 @@ func (uc *CreateStockLocationUseCase) Execute(ctx context.Context, req request.C
 
 	// Transformar la entidad de dominio en DTO de respuesta
 	return response.NewStockLocationResponse(stockLocation), nil
-} 
+}
