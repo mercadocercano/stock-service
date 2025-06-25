@@ -1,0 +1,31 @@
+# Dockerfile.dev para Go con hot reload
+FROM golang:1.24-alpine
+
+WORKDIR /app
+
+# Instalar dependencias del sistema y air para hot reload
+RUN apk add --no-cache git curl postgresql-client && \
+    go install github.com/air-verse/air@latest
+
+# Copiar archivos de proyecto
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copiar todo el código fuente
+COPY . .
+
+# Configuración para Air (hot reload)
+COPY .air.toml ./
+
+# Variables de entorno para desarrollo
+ENV GO111MODULE=on
+ENV CGO_ENABLED=0
+ENV PORT=8080
+ENV GIN_MODE=debug
+
+# Exponer puerto
+EXPOSE 8080
+EXPOSE 2114
+
+# Comando para ejecutar con hot reload
+CMD ["air", "-c", ".air.toml"]
