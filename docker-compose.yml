@@ -1,51 +1,43 @@
 version: '3.8'
 
 services:
-  # PostgreSQL for stock service
-  postgres:
-    image: postgres:15-alpine
-    container_name: stock-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: stock_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - stock-network
-
-  # stock Service
+  # Stock Service
   stock-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: stock-service
+      target: development
+    container_name: tv-stock-service
     environment:
+      # PostgreSQL configuration (using shared postgres)
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: stock_db
       DB_SSLMODE: disable
+      # Development environment
+      GIN_MODE: debug
+      LOG_LEVEL: debug
     ports:
       - "8100:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    volumes:
+      - ./src:/app/src:ro
+      - ./migrations:/app/migrations:ro
+    # Dependencies are handled externally via docker-compose.infra.yml
     networks:
-      - stock-network
-
-volumes:
-  postgres_data:
+      - saas-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "logging=promtail"
+      - "service_name=stock-service"
 
 networks:
-  stock-network:
-    driver: bridge
+  saas-network:
+    external: true

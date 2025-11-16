@@ -86,7 +86,7 @@ func main() {
 
 	// Configurar módulos
 	setupLocationModule(v1, db)
-	setupWarehouseModule(v1, db)
+	// setupWarehouseModule(v1, db) // COMENTADO: Conflicto de rutas con location/:id
 	setupStockLocationModule(v1, db)
 
 	// Iniciar el servidor
