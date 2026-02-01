@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: tv-stock-service
+    container_name: mc-stock-service
     environment:
       # PostgreSQL configuration (using shared postgres)
       DB_HOST: postgres
