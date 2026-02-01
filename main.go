@@ -9,6 +9,7 @@ import (
 	locationConfig "stock/src/location/infrastructure/config"
 	sharedConfig "stock/src/shared/infrastructure/config"
 	stockLocationConfig "stock/src/stock_location/infrastructure/config"
+	stockEntryConfig "stock/src/stock_entry/infrastructure/config"
 	warehouseConfig "stock/src/warehouse/infrastructure/config"
 
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,7 @@ func main() {
 	setupLocationModule(v1, db)
 	// setupWarehouseModule(v1, db) // COMENTADO: Conflicto de rutas con location/:id
 	setupStockLocationModule(v1, db)
+	setupStockEntryModule(v1, db) // HITO 2: Módulo de entradas de stock
 
 	// Iniciar el servidor
 	log.Println("Servidor iniciando en http://localhost:8080")
@@ -157,5 +159,22 @@ func setupStockLocationModule(router *gin.RouterGroup, db *sql.DB) {
 	log.Println("  PUT    /api/v1/stock-locations/:id")
 	log.Println("  DELETE /api/v1/stock-locations/:id")
 	log.Println("  GET    /api/v1/warehouses/:warehouse_id/stock-locations")
+}
+
+// setupStockEntryModule configura el módulo StockEntry (HITO 2)
+func setupStockEntryModule(router *gin.RouterGroup, db *sql.DB) {
+	log.Println("Configurando módulo StockEntry...")
+
+	// Crear configuración del módulo StockEntry
+	stockEntryCfg := stockEntryConfig.NewStockEntryConfig(db)
+
+	// Registrar rutas
+	stockEntryCfg.Controller.RegisterRoutes(router)
+
+	log.Println("Módulo StockEntry configurado exitosamente")
+	log.Println("Rutas StockEntry disponibles:")
+	log.Println("  POST   /api/v1/stock-entries")
+	log.Println("  POST   /api/v1/stock-entries/bulk")
+	log.Println("  GET    /api/v1/availability")
 }
 // Test change for git hook
