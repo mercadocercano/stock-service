@@ -3,7 +3,7 @@ package response
 import (
 	"time"
 	
-	"stock-service/src/stock_entry/domain/entity"
+	"stock/src/stock_entry/domain/entity"
 )
 
 // StockEntryResponse representa la respuesta de una entrada de stock

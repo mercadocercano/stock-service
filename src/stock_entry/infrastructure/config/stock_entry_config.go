@@ -3,9 +3,9 @@ package config
 import (
 	"database/sql"
 	
-	"stock-service/src/stock_entry/application/usecase"
-	"stock-service/src/stock_entry/infrastructure/controller"
-	"stock-service/src/stock_entry/infrastructure/persistence"
+	"stock/src/stock_entry/application/usecase"
+	"stock/src/stock_entry/infrastructure/controller"
+	"stock/src/stock_entry/infrastructure/persistence"
 )
 
 // StockEntryConfig configuración del módulo stock_entry
@@ -23,12 +23,22 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 	createStockEntryUseCase := usecase.NewCreateStockEntryUseCase(stockEntryRepo)
 	bulkCreateStockEntryUseCase := usecase.NewBulkCreateStockEntryUseCase(stockEntryRepo)
 	getAvailabilityUseCase := usecase.NewGetAvailabilityUseCase(stockAvailabilityRepo)
+	reserveStockUseCase := usecase.NewReserveStockUseCase(stockAvailabilityRepo, stockEntryRepo)
+	releaseStockUseCase := usecase.NewReleaseStockUseCase(stockAvailabilityRepo, stockEntryRepo)
+	consumeStockUseCase := usecase.NewConsumeStockUseCase(stockAvailabilityRepo, stockEntryRepo)
+	revertConsumeUseCase := usecase.NewRevertConsumeUseCase(stockAvailabilityRepo, stockEntryRepo)
+	processSaleUseCase := usecase.NewProcessSaleUseCase(stockEntryRepo, stockAvailabilityRepo)
 	
 	// Controller
 	stockEntryController := controller.NewStockEntryController(
 		createStockEntryUseCase,
 		bulkCreateStockEntryUseCase,
 		getAvailabilityUseCase,
+		reserveStockUseCase,
+		releaseStockUseCase,
+		consumeStockUseCase,
+		revertConsumeUseCase,
+		processSaleUseCase,
 	)
 	
 	return &StockEntryConfig{

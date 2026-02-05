@@ -1,8 +1,16 @@
 openapi: 3.1.0
 info:
   title: Multi-Tenant Stock API
-  version: 1.0.0
-  description: API para gestión de stock multi-tenant (almacenes, ubicaciones y stock)
+  version: 2.0.0
+  description: |
+    API para gestión de stock multi-tenant (almacenes, ubicaciones y stock).
+    
+    ## 🔄 Actualizado v2.0.0 (HITO 2)
+    
+    - ✅ **Stock Entries**: Carga individual y masiva de stock por variant_sku
+    - ✅ **Availability**: Consulta de disponibilidad por SKU/variante
+    - ✅ **Trigger automático**: Actualización automática de availability
+    - 🛡️ **Multi-tenancy**: Todas las operaciones requieren X-Tenant-ID
 
 servers:
   - url: /stock/api/v1
@@ -335,6 +343,148 @@ components:
         total_pages:
           type: integer
           description: Total de páginas
+
+    # ==========================================
+    # STOCK ENTRY SCHEMAS (HITO 2)
+    # ==========================================
+    StockEntry:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - variant_sku
+        - entry_type
+        - quantity
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único de la entrada de stock
+        tenant_id:
+          type: string
+          format: uuid
+          description: ID del tenant
+        variant_sku:
+          type: string
+          description: SKU de la variante del producto
+        entry_type:
+          type: string
+          enum: ["initial_stock", "purchase", "adjustment", "transfer_in", "transfer_out", "sale", "return"]
+          description: Tipo de entrada de stock
+        quantity:
+          type: number
+          description: Cantidad (positiva o negativa según el tipo)
+        reference_id:
+          type: string
+          description: ID de referencia (orden, transferencia, etc.)
+        notes:
+          type: string
+          description: Notas adicionales
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación
+
+    CreateStockEntryRequest:
+      type: object
+      required:
+        - variant_sku
+        - entry_type
+        - quantity
+      properties:
+        variant_sku:
+          type: string
+          example: "TALADRO-BOSCH-750W"
+          description: SKU de la variante
+        entry_type:
+          type: string
+          enum: ["initial_stock", "purchase", "adjustment", "transfer_in", "transfer_out", "sale", "return"]
+          example: "initial_stock"
+          description: Tipo de entrada
+        quantity:
+          type: number
+          minimum: 0
+          example: 50
+          description: Cantidad a registrar
+        reference_id:
+          type: string
+          description: ID de referencia opcional
+        notes:
+          type: string
+          description: Notas adicionales
+
+    BulkStockEntryRequest:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateStockEntryRequest'
+          description: Lista de entradas de stock a crear
+          example:
+            - variant_sku: "TALADRO-BOSCH-750W"
+              entry_type: "initial_stock"
+              quantity: 50
+            - variant_sku: "TALADRO-BOSCH-1000W"
+              entry_type: "initial_stock"
+              quantity: 30
+
+    BulkStockEntryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Si la operación fue exitosa
+        created:
+          type: integer
+          description: Cantidad de entradas creadas
+        failed:
+          type: integer
+          description: Cantidad de entradas fallidas
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              variant_sku:
+                type: string
+              error:
+                type: string
+          description: Errores por SKU
+
+    StockAvailability:
+      type: object
+      properties:
+        variant_sku:
+          type: string
+          description: SKU de la variante
+        available_quantity:
+          type: number
+          description: Cantidad disponible
+        reserved_quantity:
+          type: number
+          description: Cantidad reservada
+        total_quantity:
+          type: number
+          description: Cantidad total
+        last_updated:
+          type: string
+          format: date-time
+          description: Última actualización
+
+    AvailabilityListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockAvailability'
+        total_count:
+          type: integer
+          description: Total de elementos
 
     # Esquemas de error
     Error:
@@ -846,4 +996,166 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
       security:
-        - tenantId: [] 
+        - tenantId: []
+
+  # ==========================================
+  # STOCK ENTRIES ENDPOINTS (HITO 2)
+  # ==========================================
+  /stock-entries:
+    post:
+      summary: Crear entrada de stock
+      description: Registra una nueva entrada de stock para una variante específica
+      tags:
+        - Stock Entries
+      security:
+        - BearerAuth: []
+        - tenantId: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStockEntryRequest'
+      responses:
+        '201':
+          description: Entrada de stock creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /stock-entries/bulk:
+    post:
+      summary: Carga masiva de stock
+      description: |
+        Registra múltiples entradas de stock en una sola operación.
+        Útil para carga inicial de inventario o actualizaciones masivas.
+        
+        **Implementado en HITO 2** para el flujo de Quickstart.
+      tags:
+        - Stock Entries
+      security:
+        - BearerAuth: []
+        - tenantId: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkStockEntryRequest'
+            example:
+              entries:
+                - variant_sku: "TALADRO-BOSCH-750W"
+                  entry_type: "initial_stock"
+                  quantity: 50
+                  notes: "Stock inicial ferretería"
+                - variant_sku: "TALADRO-BOSCH-1000W"
+                  entry_type: "initial_stock"
+                  quantity: 30
+                  notes: "Stock inicial ferretería"
+      responses:
+        '200':
+          description: Resultado de la carga masiva
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkStockEntryResponse'
+              example:
+                success: true
+                created: 2
+                failed: 0
+                errors: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ==========================================
+  # AVAILABILITY ENDPOINTS (HITO 2)
+  # ==========================================
+  /availability:
+    get:
+      summary: Consultar disponibilidad de stock
+      description: |
+        Obtiene la disponibilidad de stock para una o más variantes.
+        El stock se calcula automáticamente mediante un trigger en la base de datos.
+        
+        **Implementado en HITO 2** para consulta de disponibilidad en el Quickstart.
+      tags:
+        - Availability
+      security:
+        - BearerAuth: []
+        - tenantId: []
+      parameters:
+        - name: variant_sku
+          in: query
+          description: SKU de la variante a consultar
+          required: false
+          schema:
+            type: string
+        - name: variant_skus
+          in: query
+          description: Lista de SKUs separados por coma
+          required: false
+          schema:
+            type: string
+            example: "TALADRO-BOSCH-750W,TALADRO-BOSCH-1000W"
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Disponibilidad de stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityListResponse'
+              example:
+                items:
+                  - variant_sku: "TALADRO-BOSCH-750W"
+                    available_quantity: 50
+                    reserved_quantity: 0
+                    total_quantity: 50
+                    last_updated: "2026-02-01T10:00:00Z"
+                total_count: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /availability/{variant_sku}:
+    get:
+      summary: Consultar disponibilidad por SKU
+      description: Obtiene la disponibilidad de stock para una variante específica
+      tags:
+        - Availability
+      security:
+        - BearerAuth: []
+        - tenantId: []
+      parameters:
+        - name: variant_sku
+          in: path
+          required: true
+          schema:
+            type: string
+          description: SKU de la variante
+      responses:
+        '200':
+          description: Disponibilidad de la variante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockAvailability'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'

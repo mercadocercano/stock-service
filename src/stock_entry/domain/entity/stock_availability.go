@@ -5,16 +5,17 @@ import (
 
 	"github.com/google/uuid"
 	
-	"stock-service/src/stock_entry/domain/exception"
+	"stock/src/stock_entry/domain/exception"
 )
 
-// StockAvailability representa la disponibilidad consolidada de un producto
+// StockAvailability representa la disponibilidad consolidada de una variante de producto
 type StockAvailability struct {
 	ID        uuid.UUID
 	TenantID  uuid.UUID
 	
-	// Producto
-	ProductSKU  string
+	// Variante del producto (HITO 2.1)
+	VariantSKU  string      // Campo principal - SKU de la variante
+	ProductSKU  string      // Alias para compatibilidad
 	ProductID   *uuid.UUID
 	ProductName string
 	
@@ -45,10 +46,10 @@ type StockAvailability struct {
 	UpdatedAt time.Time
 }
 
-// NewStockAvailability crea una nueva instancia de disponibilidad
+// NewStockAvailability crea una nueva instancia de disponibilidad (HITO 2.1)
 func NewStockAvailability(
 	tenantID uuid.UUID,
-	productSKU string,
+	variantSKU string,
 	totalQuantity float64,
 ) *StockAvailability {
 	now := time.Now()
@@ -56,13 +57,14 @@ func NewStockAvailability(
 	return &StockAvailability{
 		ID:                uuid.New(),
 		TenantID:          tenantID,
-		ProductSKU:        productSKU,
+		VariantSKU:        variantSKU,
+		ProductSKU:        variantSKU,  // Mantener sincronizado
 		AvailableQuantity: totalQuantity,
 		ReservedQuantity:  0,
 		TotalQuantity:     totalQuantity,
 		UnitOfMeasure:     "unit",
 		MinStockLevel:     0,
-		IsLowStock:        totalQuantity < 10,  // Simplificado
+		IsLowStock:        totalQuantity < 10,
 		IsOutOfStock:      totalQuantity <= 0,
 		UpdatedAt:         now,
 	}

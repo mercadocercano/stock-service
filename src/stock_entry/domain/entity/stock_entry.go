@@ -34,9 +34,10 @@ type StockEntry struct {
 	ID        uuid.UUID
 	TenantID  uuid.UUID
 	
-	// Producto
-	ProductSKU  string
-	ProductID   *uuid.UUID  // Opcional
+	// Variante del producto (HITO 2.1)
+	VariantSKU  string      // Campo principal - SKU de la variante
+	ProductSKU  string      // Alias para compatibilidad (mismo valor que VariantSKU)
+	ProductID   *uuid.UUID  // Opcional - ID del producto padre
 	ProductName string
 	
 	// Location
@@ -66,16 +67,16 @@ type StockEntry struct {
 	UpdatedAt time.Time
 }
 
-// NewStockEntry crea una nueva entrada de stock
+// NewStockEntry crea una nueva entrada de stock (HITO 2.1 - variant_sku)
 func NewStockEntry(
 	tenantID uuid.UUID,
-	productSKU string,
+	variantSKU string,
 	entryType EntryType,
 	quantity float64,
 ) (*StockEntry, error) {
 	// Validaciones
-	if productSKU == "" {
-		return nil, errors.New("product SKU is required")
+	if variantSKU == "" {
+		return nil, errors.New("variant SKU is required")
 	}
 	
 	if quantity == 0 {
@@ -91,11 +92,12 @@ func NewStockEntry(
 	return &StockEntry{
 		ID:            uuid.New(),
 		TenantID:      tenantID,
-		ProductSKU:    productSKU,
+		VariantSKU:    variantSKU,
+		ProductSKU:    variantSKU,  // Mantener sincronizado para compatibilidad
 		EntryType:     entryType,
 		Quantity:      quantity,
 		UnitOfMeasure: "unit",  // Default
-		Status:        EntryStatusConfirmed,  // Default confirmado
+		Status:        EntryStatusConfirmed,
 		IsActive:      true,
 		Metadata:      make(map[string]interface{}),
 		CreatedAt:     now,

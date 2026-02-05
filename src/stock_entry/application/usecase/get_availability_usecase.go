@@ -6,8 +6,8 @@ import (
 	
 	"github.com/google/uuid"
 	
-	"stock-service/src/stock_entry/application/response"
-	"stock-service/src/stock_entry/domain/port"
+	"stock/src/stock_entry/application/response"
+	"stock/src/stock_entry/domain/port"
 )
 
 // GetAvailabilityUseCase caso de uso para consultar disponibilidad de stock

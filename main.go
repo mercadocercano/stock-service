@@ -176,5 +176,6 @@ func setupStockEntryModule(router *gin.RouterGroup, db *sql.DB) {
 	log.Println("  POST   /api/v1/stock-entries")
 	log.Println("  POST   /api/v1/stock-entries/bulk")
 	log.Println("  GET    /api/v1/availability")
+	log.Println("  POST   /api/v1/sale              (minimal mock endpoint)")
 }
 // Test change for git hook

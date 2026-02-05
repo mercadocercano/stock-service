@@ -6,11 +6,11 @@ import (
 	"fmt"
 	
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	// "github.com/lib/pq" // No usado actualmente
 	
-	"stock-service/src/stock_entry/domain/entity"
-	"stock-service/src/stock_entry/domain/exception"
-	"stock-service/src/stock_entry/domain/port"
+	"stock/src/stock_entry/domain/entity"
+	"stock/src/stock_entry/domain/exception"
+	"stock/src/stock_entry/domain/port"
 )
 
 // PostgresStockEntryRepository implementación PostgreSQL del repositorio
@@ -23,20 +23,21 @@ func NewPostgresStockEntryRepository(db *sql.DB) port.StockEntryRepository {
 	return &PostgresStockEntryRepository{db: db}
 }
 
-// Save guarda una entrada de stock
+// Save guarda una entrada de stock (HITO 2.1 - con variant_sku)
 func (r *PostgresStockEntryRepository) Save(ctx context.Context, entry *entity.StockEntry) error {
 	query := `
 		INSERT INTO stock_entries (
-			id, tenant_id, product_sku, product_id, product_name, location_id,
+			id, tenant_id, variant_sku, product_sku, product_id, product_name, location_id,
 			entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			reference_number, notes, status, is_active, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`
 	
 	_, err := r.db.ExecContext(ctx, query,
 		entry.ID,
 		entry.TenantID,
-		entry.ProductSKU,
+		entry.VariantSKU,
+		entry.VariantSKU,  // Copiar a product_sku por compatibilidad
 		entry.ProductID,
 		entry.ProductName,
 		entry.LocationID,
@@ -60,7 +61,7 @@ func (r *PostgresStockEntryRepository) Save(ctx context.Context, entry *entity.S
 	return nil
 }
 
-// SaveBulk guarda múltiples entradas
+// SaveBulk guarda múltiples entradas (HITO 2.1 - con variant_sku)
 func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*entity.StockEntry) error {
 	if len(entries) == 0 {
 		return nil
@@ -75,10 +76,10 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 	
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO stock_entries (
-			id, tenant_id, product_sku, product_id, product_name, location_id,
+			id, tenant_id, variant_sku, product_sku, product_id, product_name, location_id,
 			entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			reference_number, notes, status, is_active, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`)
 	if err != nil {
 		return err
@@ -89,7 +90,8 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 		_, err = stmt.ExecContext(ctx,
 			entry.ID,
 			entry.TenantID,
-			entry.ProductSKU,
+			entry.VariantSKU,
+			entry.VariantSKU,  // Copiar a product_sku
 			entry.ProductID,
 			entry.ProductName,
 			entry.LocationID,
@@ -106,7 +108,7 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 			entry.UpdatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("error saving entry for SKU %s: %w", entry.ProductSKU, err)
+			return fmt.Errorf("error saving entry for variant SKU %s: %w", entry.VariantSKU, err)
 		}
 	}
 	
@@ -116,7 +118,7 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 // FindByID busca una entrada por ID
 func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) (*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
@@ -127,7 +129,7 @@ func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUI
 	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
 		&entry.ID,
 		&entry.TenantID,
-		&entry.ProductSKU,
+		&entry.VariantSKU,
 		&entry.ProductID,
 		&entry.ProductName,
 		&entry.LocationID,
@@ -144,6 +146,9 @@ func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUI
 		&entry.UpdatedAt,
 	)
 	
+	// Mantener product_sku sincronizado
+	entry.ProductSKU = entry.VariantSKU
+	
 	if err == sql.ErrNoRows {
 		return nil, exception.ErrStockEntryNotFound
 	}
@@ -154,18 +159,18 @@ func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUI
 	return entry, nil
 }
 
-// FindByTenantAndSKU busca entradas por tenant y SKU
-func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, productSKU string) ([]*entity.StockEntry, error) {
+// FindByTenantAndSKU busca entradas por tenant y variant SKU
+func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) ([]*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
-		WHERE tenant_id = $1 AND product_sku = $2 AND is_active = true
+		WHERE tenant_id = $1 AND (variant_sku = $2 OR product_sku = $2) AND is_active = true
 		ORDER BY created_at DESC
 	`
 	
-	rows, err := r.db.QueryContext(ctx, query, tenantID, productSKU)
+	rows, err := r.db.QueryContext(ctx, query, tenantID, variantSKU)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +182,7 @@ func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, t
 		err := rows.Scan(
 			&entry.ID,
 			&entry.TenantID,
-			&entry.ProductSKU,
+			&entry.VariantSKU,
 			&entry.ProductID,
 			&entry.ProductName,
 			&entry.LocationID,
@@ -196,6 +201,7 @@ func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, t
 		if err != nil {
 			return nil, err
 		}
+		entry.ProductSKU = entry.VariantSKU  // Mantener sincronizado
 		entries = append(entries, entry)
 	}
 	
@@ -205,7 +211,7 @@ func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, t
 // FindByTenant busca entradas por tenant con paginación
 func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
@@ -226,7 +232,7 @@ func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantI
 		err := rows.Scan(
 			&entry.ID,
 			&entry.TenantID,
-			&entry.ProductSKU,
+			&entry.VariantSKU,
 			&entry.ProductID,
 			&entry.ProductName,
 			&entry.LocationID,
@@ -245,6 +251,7 @@ func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantI
 		if err != nil {
 			return nil, err
 		}
+		entry.ProductSKU = entry.VariantSKU  // Mantener sincronizado
 		entries = append(entries, entry)
 	}
 	
@@ -282,24 +289,25 @@ func NewPostgresStockAvailabilityRepository(db *sql.DB) port.StockAvailabilityRe
 	return &PostgresStockAvailabilityRepository{db: db}
 }
 
-// FindByTenantAndSKU busca disponibilidad por tenant y SKU
-func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, productSKU string) (*entity.StockAvailability, error) {
+// FindByTenantAndSKU busca disponibilidad por tenant y variant SKU (HITO 2.1)
+func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) (*entity.StockAvailability, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
 			   available_quantity, reserved_quantity, total_quantity, unit_of_measure,
 			   avg_unit_cost, total_value, min_stock_level, max_stock_level,
 			   is_low_stock, is_out_of_stock, last_entry_at, updated_at
 		FROM stock_availability
-		WHERE tenant_id = $1 AND product_sku = $2
+		WHERE tenant_id = $1 AND (variant_sku = $2 OR product_sku = $2)
+		ORDER BY updated_at DESC
+		LIMIT 1
 	`
 	
 	availability := &entity.StockAvailability{}
-	var lastMovementType sql.NullString
 	
-	err := r.db.QueryRowContext(ctx, query, tenantID, productSKU).Scan(
+	err := r.db.QueryRowContext(ctx, query, tenantID, variantSKU).Scan(
 		&availability.ID,
 		&availability.TenantID,
-		&availability.ProductSKU,
+		&availability.VariantSKU,
 		&availability.ProductID,
 		&availability.ProductName,
 		&availability.LocationID,
@@ -317,15 +325,14 @@ func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Con
 		&availability.UpdatedAt,
 	)
 	
+	// Mantener product_sku sincronizado
+	availability.ProductSKU = availability.VariantSKU
+	
 	if err == sql.ErrNoRows {
 		return nil, exception.ErrStockAvailabilityNotFound
 	}
 	if err != nil {
 		return nil, err
-	}
-	
-	if lastMovementType.Valid {
-		availability.LastMovementType = &lastMovementType.String
 	}
 	
 	return availability, nil

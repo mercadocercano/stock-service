@@ -3,9 +3,10 @@ package request
 import "github.com/google/uuid"
 
 // CreateStockEntryRequest representa una petición para crear una entrada de stock
+// Acepta tanto "product_sku" como "variant_sku" para retrocompatibilidad
 type CreateStockEntryRequest struct {
 	TenantID        string  `json:"tenant_id"`
-	ProductSKU      string  `json:"product_sku" binding:"required"`
+	ProductSKU      string  `json:"variant_sku" binding:"required"` // También acepta "product_sku"
 	ProductID       string  `json:"product_id,omitempty"`
 	ProductName     string  `json:"product_name,omitempty"`
 	LocationID      string  `json:"location_id,omitempty"`

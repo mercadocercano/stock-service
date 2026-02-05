@@ -5,7 +5,7 @@ import (
 	
 	"github.com/google/uuid"
 	
-	"stock-service/src/stock_entry/domain/entity"
+	"stock/src/stock_entry/domain/entity"
 )
 
 // StockEntryRepository define las operaciones del repositorio de entradas de stock
