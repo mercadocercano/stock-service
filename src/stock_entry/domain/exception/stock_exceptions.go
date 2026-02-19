@@ -9,6 +9,9 @@ var (
 	// ErrStockAvailabilityNotFound cuando no se encuentra disponibilidad para un producto
 	ErrStockAvailabilityNotFound = errors.New("stock availability not found")
 	
+	// ErrStockNotInitialized cuando el producto nunca tuvo movimientos de stock
+	ErrStockNotInitialized = errors.New("stock not initialized for this product")
+	
 	// ErrInsufficientStock cuando no hay suficiente stock disponible
 	ErrInsufficientStock = errors.New("insufficient stock available")
 	

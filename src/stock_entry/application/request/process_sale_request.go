@@ -4,6 +4,7 @@ package request
 type ProcessSaleRequest struct {
 	VariantSKU string  `json:"variant_sku" binding:"required"`
 	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
+	Reference  string  `json:"reference,omitempty"` // Opcional: referencia externa (POS sale ID, order ID, etc.)
 }
 
 // Validate valida la petición

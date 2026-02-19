@@ -2,13 +2,15 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 	
 	"github.com/google/uuid"
 	
 	"stock/src/stock_entry/application/request"
 	"stock/src/stock_entry/application/response"
-	"stock/src/stock_entry/domain/entity"
+	"stock/src/stock_entry/domain/exception"
 	"stock/src/stock_entry/domain/port"
 )
 
@@ -29,7 +31,8 @@ func NewProcessSaleUseCase(
 	}
 }
 
-// Execute ejecuta el caso de uso de venta
+// Execute ejecuta el caso de uso de venta con operación atómica
+// HITO D: Refactorizado para eliminar race conditions
 func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req *request.ProcessSaleRequest) (*response.ProcessSaleResponse, error) {
 	// Validar request
 	if err := req.Validate(); err != nil {
@@ -42,56 +45,70 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 		return nil, fmt.Errorf("invalid tenant_id: %w", err)
 	}
 	
-	// 1. Verificar disponibilidad
-	availability, err := uc.availabilityRepo.FindByTenantAndSKU(ctx, tenantUUID, req.VariantSKU)
-	if err != nil {
-		return &response.ProcessSaleResponse{
-			Success:    false,
-			Message:    fmt.Sprintf("Product not found: %s", req.VariantSKU),
-			VariantSKU: req.VariantSKU,
-		}, nil
+	// Generar referencia única (o usar la provista)
+	reference := req.Reference
+	if reference == "" {
+		reference = fmt.Sprintf("SALE-%s", uuid.New().String()[:8])
 	}
-	
-	// 2. Verificar que hay stock suficiente
-	if availability.AvailableQuantity < req.Quantity {
-		return &response.ProcessSaleResponse{
-			Success:        false,
-			Message:        fmt.Sprintf("Insufficient stock. Available: %.2f, Requested: %.2f", availability.AvailableQuantity, req.Quantity),
-			VariantSKU:     req.VariantSKU,
-			RemainingStock: availability.AvailableQuantity,
-		}, nil
-	}
-	
-	// 3. Crear entrada de stock tipo "sale" con cantidad negativa
-	stockEntry, err := entity.NewStockEntry(
+
+	// OPERACIÓN ATÓMICA: lock + validar + descontar en una sola transacción
+	// Elimina race condition entre CheckAvailability y ProcessSale
+	stockEntry, err := uc.stockEntryRepo.ProcessSaleAtomic(
+		ctx,
 		tenantUUID,
 		req.VariantSKU,
-		entity.EntryTypeSale,
-		req.Quantity, // La cantidad se registra positiva, el método CalculatedQuantity() la convertirá a negativa
+		req.Quantity,
+		reference,
 	)
+	
 	if err != nil {
-		return nil, fmt.Errorf("error creating stock entry: %w", err)
+		// Distinguir errores de negocio (400/409) vs errores técnicos (500)
+		
+		// Stock no inicializado → producto sin movimientos previos
+		if errors.Is(err, exception.ErrStockNotInitialized) {
+			return &response.ProcessSaleResponse{
+				Success:    false,
+				Message:    fmt.Sprintf("Stock not initialized for SKU: %s. Product needs initial stock entry.", req.VariantSKU),
+				VariantSKU: req.VariantSKU,
+			}, nil
+		}
+		
+		// Stock insuficiente → validación de negocio
+		if errors.Is(err, exception.ErrInsufficientStock) {
+			return &response.ProcessSaleResponse{
+				Success:    false,
+				Message:    err.Error(),
+				VariantSKU: req.VariantSKU,
+			}, nil
+		}
+		
+		// Error técnico (DB connection, transacción fallida, etc.)
+		return nil, fmt.Errorf("failed to process sale atomically: %w", err)
 	}
-	
-	// Agregar referencia de la venta
-	refNumber := fmt.Sprintf("SALE-%s", uuid.New().String()[:8])
-	stockEntry.SetReference(refNumber)
-	stockEntry.SetNotes("Sale processed via minimal mock endpoint")
-	
-	// 4. Guardar en repositorio
-	if err := uc.stockEntryRepo.Save(ctx, stockEntry); err != nil {
-		return nil, fmt.Errorf("error saving stock entry: %w", err)
+
+	// Leer stock actualizado (post-commit del trigger)
+	availability, err := uc.availabilityRepo.FindByTenantAndSKU(ctx, tenantUUID, req.VariantSKU)
+	if err != nil {
+		// Si la venta se procesó correctamente pero no podemos leer availability,
+		// aún retornamos success pero sin remaining stock
+		return &response.ProcessSaleResponse{
+			Success:      true,
+			Message:      "Sale processed successfully (availability read failed)",
+			VariantSKU:   req.VariantSKU,
+			QuantitySold: req.Quantity,
+			StockEntryID: stockEntry.ID.String(),
+			Timestamp:    time.Now().UTC(),
+		}, nil
 	}
-	
-	// 5. Calcular stock restante
-	remainingStock := availability.AvailableQuantity - req.Quantity
-	
+
 	return &response.ProcessSaleResponse{
 		Success:        true,
 		Message:        "Sale processed successfully",
 		VariantSKU:     req.VariantSKU,
 		QuantitySold:   req.Quantity,
-		RemainingStock: remainingStock,
+		RemainingStock: availability.AvailableQuantity,
+		TotalQuantity:  availability.TotalQuantity,
 		StockEntryID:   stockEntry.ID.String(),
+		Timestamp:      time.Now().UTC(),
 	}, nil
 }

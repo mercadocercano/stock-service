@@ -10,6 +10,7 @@ import (
 type StockEntryResponse struct {
 	ID              string                 `json:"id"`
 	TenantID        string                 `json:"tenant_id"`
+	VariantSKU      string                 `json:"variant_sku,omitempty"`
 	ProductSKU      string                 `json:"product_sku"`
 	ProductID       *string                `json:"product_id,omitempty"`
 	ProductName     string                 `json:"product_name,omitempty"`

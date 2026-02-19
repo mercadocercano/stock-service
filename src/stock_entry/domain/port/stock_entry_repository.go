@@ -27,6 +27,15 @@ type StockEntryRepository interface {
 	
 	// Delete elimina una entrada de stock (soft delete)
 	Delete(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) error
+	
+	// ProcessSaleAtomic valida y descuenta stock en una sola transacción atómica
+	// Retorna el stock_entry creado o error si no hay stock suficiente
+	// HITO D: Operación atómica para eliminar race conditions
+	ProcessSaleAtomic(ctx context.Context, tenantID uuid.UUID, variantSKU string, quantity float64, reference string) (*entity.StockEntry, error)
+	
+	// CompensateSale revierte una venta creando un movimiento inverso (tipo 'return')
+	// HITO D: Compensación para rollback de ventas fallidas
+	CompensateSale(ctx context.Context, tenantID uuid.UUID, stockEntryID uuid.UUID, reason string) error
 }
 
 // StockAvailabilityRepository define las operaciones del repositorio de disponibilidad

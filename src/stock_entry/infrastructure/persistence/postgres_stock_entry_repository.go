@@ -279,6 +279,140 @@ func (r *PostgresStockEntryRepository) Delete(ctx context.Context, id uuid.UUID,
 	return nil
 }
 
+// ProcessSaleAtomic valida y descuenta stock en una sola transacción atómica
+// HITO D: Operación atómica con SELECT FOR UPDATE para eliminar race conditions
+func (r *PostgresStockEntryRepository) ProcessSaleAtomic(
+	ctx context.Context,
+	tenantID uuid.UUID,
+	variantSKU string,
+	quantity float64,
+	reference string,
+) (*entity.StockEntry, error) {
+	// Iniciar transacción
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. SELECT FOR UPDATE - Lock row y obtener disponibilidad actual
+	// Falla con sql.ErrNoRows si el producto nunca tuvo movimientos (correcto)
+	var availableQty float64
+	lockQuery := `
+		SELECT available_quantity 
+		FROM stock_availability 
+		WHERE tenant_id = $1 
+		  AND variant_sku = $2 
+		  AND location_id IS NULL
+		FOR UPDATE
+	`
+	
+	err = tx.QueryRowContext(ctx, lockQuery, tenantID, variantSKU).Scan(&availableQty)
+	if err == sql.ErrNoRows {
+		// Producto sin stock inicializado → no vendible
+		return nil, exception.ErrStockNotInitialized
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to lock stock availability: %w", err)
+	}
+
+	// 2. Validación en Go (no en DB, no en trigger)
+	if availableQty < quantity {
+		return nil, fmt.Errorf("%w: available=%.2f, requested=%.2f", 
+			exception.ErrInsufficientStock, availableQty, quantity)
+	}
+
+	// 3. Crear entidad de dominio
+	stockEntry, err := entity.NewStockEntry(
+		tenantID,
+		variantSKU,
+		entity.EntryTypeSale,
+		quantity,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stock entry entity: %w", err)
+	}
+	
+	stockEntry.SetReference(reference)
+	if err := stockEntry.Confirm(); err != nil {
+		return nil, fmt.Errorf("failed to confirm stock entry: %w", err)
+	}
+
+	// 4. Persistir movimiento de venta
+	insertQuery := `
+		INSERT INTO stock_entries (
+			id, tenant_id, variant_sku, product_sku, 
+			entry_type, quantity, reference_number, 
+			status, is_active, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW(), NOW())
+	`
+	
+	_, err = tx.ExecContext(ctx, insertQuery,
+		stockEntry.ID,
+		tenantID,
+		variantSKU,
+		variantSKU, // Copiar a product_sku por compatibilidad
+		entity.EntryTypeSale,
+		quantity,
+		reference,
+		"confirmed",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert stock entry: %w", err)
+	}
+
+	// 5. COMMIT - El trigger update_stock_availability_v2 recalculará stock
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return stockEntry, nil
+}
+
+// CompensateSale revierte una venta creando un movimiento inverso
+// HITO D: Compensación para rollback cuando falla persistencia de sale/order
+func (r *PostgresStockEntryRepository) CompensateSale(
+	ctx context.Context,
+	tenantID uuid.UUID,
+	stockEntryID uuid.UUID,
+	reason string,
+) error {
+	// 1. Buscar el stock_entry original
+	original, err := r.FindByID(ctx, stockEntryID, tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to find original stock entry: %w", err)
+	}
+
+	// 2. Validar que sea tipo 'sale'
+	if original.EntryType != entity.EntryTypeSale {
+		return fmt.Errorf("can only compensate sale entries, got: %s", original.EntryType)
+	}
+
+	// 3. Crear movimiento inverso (return suma stock)
+	compensationEntry, err := entity.NewStockEntry(
+		tenantID,
+		original.VariantSKU,
+		entity.EntryTypeReturn, // Tipo 'return' suma stock
+		original.Quantity,      // Misma cantidad positiva
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create compensation entry: %w", err)
+	}
+
+	compensationEntry.SetReference(fmt.Sprintf("COMPENSATION-%s", stockEntryID.String()[:8]))
+	compensationEntry.SetNotes(fmt.Sprintf("Compensation for sale %s. Reason: %s", stockEntryID, reason))
+	if err := compensationEntry.Confirm(); err != nil {
+		return fmt.Errorf("failed to confirm compensation entry: %w", err)
+	}
+
+	// 4. Guardar compensación (trigger recalculará stock)
+	if err := r.Save(ctx, compensationEntry); err != nil {
+		return fmt.Errorf("failed to save compensation entry: %w", err)
+	}
+
+	return nil
+}
+
 // PostgresStockAvailabilityRepository implementación PostgreSQL
 type PostgresStockAvailabilityRepository struct {
 	db *sql.DB

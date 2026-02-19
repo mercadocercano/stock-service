@@ -28,6 +28,8 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 	consumeStockUseCase := usecase.NewConsumeStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	revertConsumeUseCase := usecase.NewRevertConsumeUseCase(stockAvailabilityRepo, stockEntryRepo)
 	processSaleUseCase := usecase.NewProcessSaleUseCase(stockEntryRepo, stockAvailabilityRepo)
+	listSalesUseCase := usecase.NewListSalesUseCase(stockEntryRepo)
+	compensateSaleUseCase := usecase.NewCompensateSaleUseCase(stockEntryRepo) // HITO D
 	
 	// Controller
 	stockEntryController := controller.NewStockEntryController(
@@ -39,6 +41,8 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 		consumeStockUseCase,
 		revertConsumeUseCase,
 		processSaleUseCase,
+		listSalesUseCase,
+		compensateSaleUseCase, // HITO D
 	)
 	
 	return &StockEntryConfig{

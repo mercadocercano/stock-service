@@ -19,6 +19,8 @@ type StockEntryController struct {
 	consumeStockUseCase         *usecase.ConsumeStockUseCase
 	revertConsumeUseCase        *usecase.RevertConsumeUseCase
 	processSaleUseCase          *usecase.ProcessSaleUseCase
+	listSalesUseCase            *usecase.ListSalesUseCase
+	compensateSaleUseCase       *usecase.CompensateSaleUseCase // HITO D
 }
 
 // NewStockEntryController crea una nueva instancia del controller
@@ -31,6 +33,8 @@ func NewStockEntryController(
 	consumeStockUseCase *usecase.ConsumeStockUseCase,
 	revertConsumeUseCase *usecase.RevertConsumeUseCase,
 	processSaleUseCase *usecase.ProcessSaleUseCase,
+	listSalesUseCase *usecase.ListSalesUseCase,
+	compensateSaleUseCase *usecase.CompensateSaleUseCase,
 ) *StockEntryController {
 	return &StockEntryController{
 		createStockEntryUseCase:     createStockEntryUseCase,
@@ -41,6 +45,8 @@ func NewStockEntryController(
 		consumeStockUseCase:         consumeStockUseCase,
 		revertConsumeUseCase:        revertConsumeUseCase,
 		processSaleUseCase:          processSaleUseCase,
+		listSalesUseCase:            listSalesUseCase,
+		compensateSaleUseCase:       compensateSaleUseCase,
 	}
 }
 
@@ -203,6 +209,36 @@ func (ctrl *StockEntryController) RegisterRoutes(router *gin.RouterGroup) {
 	
 	// Endpoint de venta (minimal mock)
 	router.POST("/sale", ctrl.ProcessSale)
+	
+	// Endpoint de listado de ventas (reporte POS)
+	router.GET("/sales", ctrl.ListSales)
+	
+	// Endpoint de compensación (HITO D)
+	router.POST("/compensate-sale", ctrl.CompensateSale)
+}
+
+// CompensateSale maneja la compensación (reversión) de una venta
+// HITO D: Usado para rollback cuando falla persistencia de orden
+func (ctrl *StockEntryController) CompensateSale(c *gin.Context) {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		return
+	}
+
+	var req request.CompensateSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		return
+	}
+
+	response, err := ctrl.compensateSaleUseCase.Execute(c.Request.Context(), tenantID, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // RevertConsume maneja la reversión de un consumo de stock (cancelación de orden)
@@ -283,6 +319,30 @@ func (ctrl *StockEntryController) ProcessSale(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// ListSales lista las ventas POS recientes
+func (ctrl *StockEntryController) ListSales(c *gin.Context) {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		return
+	}
+
+	// Parámetros de paginación (valores por defecto)
+	limit := 50
+	offset := 0
+
+	sales, err := ctrl.listSalesUseCase.Execute(c.Request.Context(), tenantID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": sales,
+		"total_count": len(sales),
+	})
 }
 
 // contains helper para verificar substring
