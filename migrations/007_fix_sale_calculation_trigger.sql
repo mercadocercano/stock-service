@@ -39,6 +39,9 @@ BEGIN
       AND (location_id = NEW.location_id OR (location_id IS NULL AND NEW.location_id IS NULL))
     LIMIT 1;
 
+    -- Si no existe fila, v_existing_reserved queda NULL (SELECT sin resultados)
+    v_existing_reserved := COALESCE(v_existing_reserved, 0);
+
     -- Insertar o actualizar stock_availability (simplificado - solo sin location)
     INSERT INTO stock_availability (
         tenant_id,
