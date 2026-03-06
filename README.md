@@ -2,6 +2,20 @@
 
 Este proyecto fue extraído del monorepo SaaS Marketplace como parte de la migración a repositorios independientes.
 
+## Estado en producción (Mar 2026)
+
+| Aspecto | Estado |
+|---------|--------|
+| **K8s** | ✅ Desplegado en `k8s/stock/` |
+| **Kong** | Ruta `/stock/` |
+| **DB** | `stock_db` |
+| **Endpoints clave** | `POST /api/v1/sale`, `POST /api/v1/stock-entries`, `GET /api/v1/availability` |
+| **Build** | `go build -o stock-service .` (desde `main.go`, no `cmd/api`) |
+
+Ver: `documentation/PROJECT_STATUS_MAR_2026.md`
+
+---
+
 ## Descripción
 
 Servicio stock del ecosistema SaaS Marketplace.

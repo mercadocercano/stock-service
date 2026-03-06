@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s -extldflags "-static"' \
     -a -installsuffix cgo \
     -trimpath \
-    -o stock-service ./cmd/api
+    -o stock-service .
 
 # Verify binary (skip on ARM64 Mac)
 # RUN file stock-service && \
@@ -84,7 +84,17 @@ EXPOSE 8080 2114
 CMD ["air", "-c", ".air.toml"]
 
 # ==============================================
-# Stage 4: Production stage (Distroless)
+# Stage 4: Migrate stage (Alpine + psql para Job K8s)
+# ==============================================
+FROM alpine:3.18 AS migrate
+
+RUN apk add --no-cache postgresql-client
+
+WORKDIR /app
+COPY --from=builder /app/migrations ./migrations
+
+# ==============================================
+# Stage 5: Production stage (Distroless)
 # ==============================================
 FROM gcr.io/distroless/static-debian12:nonroot AS production
 
