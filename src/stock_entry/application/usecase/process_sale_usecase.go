@@ -12,6 +12,7 @@ import (
 	"stock/src/stock_entry/application/response"
 	"stock/src/stock_entry/domain/exception"
 	"stock/src/stock_entry/domain/port"
+	"stock/src/stock_entry/infrastructure/metrics"
 )
 
 // ProcessSaleUseCase caso de uso mínimo para procesar una venta
@@ -75,6 +76,7 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 		
 		// Stock insuficiente → validación de negocio
 		if errors.Is(err, exception.ErrInsufficientStock) {
+			metrics.StockInsufficient.Inc()
 			return &response.ProcessSaleResponse{
 				Success:    false,
 				Message:    err.Error(),

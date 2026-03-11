@@ -4,14 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	
+
 	"github.com/google/uuid"
-	// "github.com/lib/pq" // No usado actualmente
-	
+
 	"stock/src/stock_entry/domain/entity"
 	"stock/src/stock_entry/domain/exception"
 	"stock/src/stock_entry/domain/port"
 )
+
+// dbExecer abstrae *sql.DB y *sql.Tx para reusar queries
+type dbExecer interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
 
 // PostgresStockEntryRepository implementación PostgreSQL del repositorio
 type PostgresStockEntryRepository struct {
@@ -53,11 +58,14 @@ func (r *PostgresStockEntryRepository) Save(ctx context.Context, entry *entity.S
 		entry.CreatedAt,
 		entry.UpdatedAt,
 	)
-	
 	if err != nil {
 		return fmt.Errorf("error saving stock entry: %w", err)
 	}
-	
+
+	if err := r.recalcAvailability(ctx, r.db, entry.TenantID, entry.VariantSKU, entry); err != nil {
+		return fmt.Errorf("error updating availability after save: %w", err)
+	}
+
 	return nil
 }
 
@@ -86,6 +94,7 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 	}
 	defer stmt.Close()
 	
+	skuSeen := make(map[string]*entity.StockEntry)
 	for _, entry := range entries {
 		_, err = stmt.ExecContext(ctx,
 			entry.ID,
@@ -110,8 +119,16 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 		if err != nil {
 			return fmt.Errorf("error saving entry for variant SKU %s: %w", entry.VariantSKU, err)
 		}
+		skuSeen[entry.VariantSKU] = entry
 	}
-	
+	stmt.Close()
+
+	for sku, entry := range skuSeen {
+		if err := r.recalcAvailability(ctx, tx, entry.TenantID, sku, entry); err != nil {
+			return fmt.Errorf("error updating availability for SKU %s: %w", sku, err)
+		}
+	}
+
 	return tx.Commit()
 }
 
@@ -361,7 +378,11 @@ func (r *PostgresStockEntryRepository) ProcessSaleAtomic(
 		return nil, fmt.Errorf("failed to insert stock entry: %w", err)
 	}
 
-	// 5. COMMIT - El trigger update_stock_availability_v2 recalculará stock
+	// 5. Recalcular stock_availability dentro de la misma TX
+	if err := r.recalcAvailability(ctx, tx, tenantID, variantSKU, stockEntry); err != nil {
+		return nil, fmt.Errorf("failed to update availability: %w", err)
+	}
+
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -405,11 +426,107 @@ func (r *PostgresStockEntryRepository) CompensateSale(
 		return fmt.Errorf("failed to confirm compensation entry: %w", err)
 	}
 
-	// 4. Guardar compensación (trigger recalculará stock)
+	// 4. Guardar compensación (Save recalcula stock_availability)
 	if err := r.Save(ctx, compensationEntry); err != nil {
 		return fmt.Errorf("failed to save compensation entry: %w", err)
 	}
 
+	return nil
+}
+
+// recalcAvailability recalcula stock_availability desde stock_entries.
+// Reemplaza la lógica que antes vivía en el trigger update_stock_availability_v2.
+// Acepta dbExecer para funcionar tanto dentro de una TX como con r.db.
+func (r *PostgresStockEntryRepository) recalcAvailability(ctx context.Context, ex dbExecer, tenantID uuid.UUID, variantSKU string, entry *entity.StockEntry) error {
+	var totalQty float64
+	var avgCost sql.NullFloat64
+	sumQuery := `
+		SELECT
+			COALESCE(SUM(
+				CASE
+					WHEN entry_type IN ('initial_stock','purchase','transfer_in','return') THEN quantity
+					WHEN entry_type IN ('sale','transfer_out') THEN -quantity
+					WHEN entry_type = 'adjustment' THEN quantity
+					ELSE 0
+				END
+			), 0),
+			COALESCE(AVG(unit_cost), 0)
+		FROM stock_entries
+		WHERE tenant_id = $1
+		  AND variant_sku = $2
+		  AND status = 'confirmed'
+	`
+	if err := ex.QueryRowContext(ctx, sumQuery, tenantID, variantSKU).Scan(&totalQty, &avgCost); err != nil {
+		return fmt.Errorf("recalcAvailability sum: %w", err)
+	}
+
+	var reservedQty float64
+	resQuery := `
+		SELECT COALESCE(reserved_quantity, 0)
+		FROM stock_availability
+		WHERE tenant_id = $1 AND variant_sku = $2 AND location_id IS NULL
+	`
+	err := ex.QueryRowContext(ctx, resQuery, tenantID, variantSKU).Scan(&reservedQty)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("recalcAvailability reserved: %w", err)
+	}
+
+	availableQty := totalQty - reservedQty
+	cost := avgCost.Float64
+	totalValue := totalQty * cost
+	isLow := totalQty > 0 && totalQty < 10
+	isOut := totalQty <= 0
+
+	var productName, unitOfMeasure, entryType *string
+	if entry != nil {
+		if entry.ProductName != "" {
+			productName = &entry.ProductName
+		}
+		if entry.UnitOfMeasure != "" {
+			unitOfMeasure = &entry.UnitOfMeasure
+		}
+		et := string(entry.EntryType)
+		entryType = &et
+	}
+
+	upsertQuery := `
+		INSERT INTO stock_availability (
+			tenant_id, variant_sku, product_sku, product_name, location_id,
+			available_quantity, reserved_quantity, total_quantity,
+			unit_of_measure, avg_unit_cost, total_value,
+			is_low_stock, is_out_of_stock,
+			last_entry_at, last_movement_type, updated_at
+		) VALUES (
+			$1, $2, $2, $3, NULL,
+			$4, $5, $6,
+			COALESCE($7, 'unit'), $8, $9,
+			$10, $11,
+			NOW(), $12, NOW()
+		)
+		ON CONFLICT (tenant_id, variant_sku) WHERE location_id IS NULL
+		DO UPDATE SET
+			available_quantity  = EXCLUDED.available_quantity,
+			reserved_quantity   = EXCLUDED.reserved_quantity,
+			total_quantity      = EXCLUDED.total_quantity,
+			unit_of_measure     = COALESCE(EXCLUDED.unit_of_measure, stock_availability.unit_of_measure),
+			avg_unit_cost       = EXCLUDED.avg_unit_cost,
+			total_value         = EXCLUDED.total_value,
+			is_low_stock        = EXCLUDED.is_low_stock,
+			is_out_of_stock     = EXCLUDED.is_out_of_stock,
+			last_entry_at       = EXCLUDED.last_entry_at,
+			last_movement_type  = EXCLUDED.last_movement_type,
+			updated_at          = NOW()
+	`
+	_, err = ex.ExecContext(ctx, upsertQuery,
+		tenantID, variantSKU, productName,
+		availableQty, reservedQty, totalQty,
+		unitOfMeasure, cost, totalValue,
+		isLow, isOut,
+		entryType,
+	)
+	if err != nil {
+		return fmt.Errorf("recalcAvailability upsert: %w", err)
+	}
 	return nil
 }
 

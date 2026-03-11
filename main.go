@@ -10,6 +10,7 @@ import (
 	sharedConfig "stock/src/shared/infrastructure/config"
 	stockLocationConfig "stock/src/stock_location/infrastructure/config"
 	stockEntryConfig "stock/src/stock_entry/infrastructure/config"
+	_ "stock/src/stock_entry/infrastructure/metrics" // H8: Registra stock_insufficient_total
 	warehouseConfig "stock/src/warehouse/infrastructure/config"
 
 	"github.com/gin-gonic/gin"
