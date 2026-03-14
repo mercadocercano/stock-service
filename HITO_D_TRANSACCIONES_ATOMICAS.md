@@ -462,7 +462,7 @@ cd services/stock-service
 go build ./...
 ```
 
-### 2. Setup DB de Test
+### 2. Setup DB de Test (opcional — tests con build tag `integration`)
 ```bash
 createdb stock_test
 psql -d stock_test -f migrations/*.sql
@@ -470,14 +470,17 @@ psql -d stock_test -f migrations/*.sql
 
 ### 3. Ejecutar Tests
 ```bash
-# Test crítico de concurrencia
-go test ./test/stock_entry/infrastructure/persistence/... -v -run TestProcessSaleAtomic_ConcurrentSales
+# Tests unitarios (sin DB, por defecto)
+go test ./...
+
+# Tests de integración ProcessSaleAtomic (requiere stock_test)
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -run TestProcessSaleAtomic_ConcurrentSales
 
 # Con race detector
-go test ./test/stock_entry/infrastructure/persistence/... -v -race
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -race
 
 # Múltiples ejecuciones
-go test ./test/stock_entry/infrastructure/persistence/... -v -count=10
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -count=10
 ```
 
 ### 4. Probar Manualmente

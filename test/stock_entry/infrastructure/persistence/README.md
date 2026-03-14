@@ -1,5 +1,7 @@
 # Tests de Transacciones Atómicas - HITO D
 
+**Nota:** Estos tests tienen build tag `integration` y se omiten por defecto (`go test ./...`). El flujo ProcessSaleAtomic está cubierto por E2E (`test_order_confirm_stock_e2e.py`, `test-pos-sale-complete-dto.sh`). Para ejecutarlos: `go test -tags=integration ./test/stock_entry/infrastructure/persistence/...` (requiere `stock_test` creada).
+
 ## 🎯 Objetivo
 
 Validar que la operación `ProcessSaleAtomic` elimina completamente las race conditions en ventas concurrentes usando `SELECT FOR UPDATE` y transacciones.
@@ -162,18 +164,20 @@ psql -d stock_test -f migrations/007_fix_sale_calculation_trigger.sql
 ### Ejecutar Tests
 
 ```bash
-# Todos los tests
+# Requiere build tag integration (tests excluidos por defecto)
 cd services/stock-service
-go test ./test/stock_entry/infrastructure/persistence/... -v
+
+# Todos los tests de integración (requiere stock_test creada)
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v
 
 # Solo el test crítico de concurrencia
-go test ./test/stock_entry/infrastructure/persistence/... -v -run TestProcessSaleAtomic_ConcurrentSales
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -run TestProcessSaleAtomic_ConcurrentSales
 
 # Con race detector (recomendado)
-go test ./test/stock_entry/infrastructure/persistence/... -v -race
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -race
 
 # Múltiples ejecuciones para detectar race conditions intermitentes
-go test ./test/stock_entry/infrastructure/persistence/... -v -count=10 -run TestProcessSaleAtomic_ConcurrentSales
+go test -tags=integration ./test/stock_entry/infrastructure/persistence/... -v -count=10 -run TestProcessSaleAtomic_ConcurrentSales
 ```
 
 ### Variables de Entorno (opcional)
