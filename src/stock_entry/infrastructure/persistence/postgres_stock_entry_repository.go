@@ -626,6 +626,17 @@ func (r *PostgresStockAvailabilityRepository) FindByTenant(ctx context.Context, 
 	return availabilities, nil
 }
 
+// CountByTenant cuenta el total de registros de disponibilidad para un tenant
+func (r *PostgresStockAvailabilityRepository) CountByTenant(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM stock_availability WHERE tenant_id = $1`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, tenantID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // FindLowStock busca productos con bajo stock
 func (r *PostgresStockAvailabilityRepository) FindLowStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error) {
 	query := `

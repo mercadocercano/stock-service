@@ -52,6 +52,9 @@ type StockAvailabilityRepository interface {
 	// FindOutOfStock busca productos sin stock
 	FindOutOfStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error)
 	
+	// CountByTenant cuenta el total de registros de disponibilidad para un tenant
+	CountByTenant(ctx context.Context, tenantID uuid.UUID) (int, error)
+
 	// Save guarda o actualiza disponibilidad
 	Save(ctx context.Context, availability *entity.StockAvailability) error
 	

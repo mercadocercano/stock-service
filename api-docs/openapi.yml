@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Multi-Tenant Stock API
-  version: 2.0.0
+  version: 2.0.1
   description: |
     API para gestión de stock multi-tenant (almacenes, ubicaciones y stock).
     
@@ -457,10 +457,14 @@ components:
 
     StockAvailability:
       type: object
+      description: Disponibilidad de un único SKU (modo consulta por sku)
       properties:
-        variant_sku:
+        product_sku:
           type: string
-          description: SKU de la variante
+          description: SKU del producto/variante
+        product_name:
+          type: string
+          description: Nombre del producto
         available_quantity:
           type: number
           description: Cantidad disponible
@@ -470,21 +474,100 @@ components:
         total_quantity:
           type: number
           description: Cantidad total
-        last_updated:
+        unit_of_measure:
+          type: string
+          description: Unidad de medida
+        avg_unit_cost:
+          type: number
+          description: Costo unitario promedio
+        total_value:
+          type: number
+          description: Valor total del stock
+        is_low_stock:
+          type: boolean
+          description: Indica si el stock está bajo el umbral mínimo
+        is_out_of_stock:
+          type: boolean
+          description: Indica si no hay stock disponible
+        last_entry_at:
           type: string
           format: date-time
-          description: Última actualización
+          description: Fecha de la última entrada de stock
+        updated_at:
+          type: string
+          format: date-time
+          description: Fecha de última actualización
+
+    StockAvailabilityListingItem:
+      type: object
+      description: Item de disponibilidad en modo listado
+      properties:
+        product_sku:
+          type: string
+          description: SKU del producto/variante
+        product_name:
+          type: string
+          description: Nombre del producto
+        available_quantity:
+          type: number
+          description: Cantidad disponible
+        reserved_quantity:
+          type: number
+          description: Cantidad reservada
+        total_quantity:
+          type: number
+          description: Cantidad total
+        unit_of_measure:
+          type: string
+          description: Unidad de medida
+        avg_unit_cost:
+          type: number
+          description: Costo unitario promedio
+        total_value:
+          type: number
+          description: Valor total del stock
+        is_low_stock:
+          type: boolean
+          description: Indica si el stock está bajo el umbral mínimo
+        is_out_of_stock:
+          type: boolean
+          description: Indica si no hay stock disponible
+        last_entry_at:
+          type: string
+          format: date-time
+          description: Fecha de la última entrada de stock
+        updated_at:
+          type: string
+          format: date-time
+          description: Fecha de última actualización
 
     AvailabilityListResponse:
       type: object
+      description: Respuesta de listado paginado de disponibilidad (modo listado sin sku)
+      required:
+        - items
+        - total_count
+        - page
+        - page_size
+        - total_pages
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/StockAvailability'
+            $ref: '#/components/schemas/StockAvailabilityListingItem'
+          description: Lista de items de disponibilidad
         total_count:
           type: integer
           description: Total de elementos
+        page:
+          type: integer
+          description: Página actual
+        page_size:
+          type: integer
+          description: Tamaño de página
+        total_pages:
+          type: integer
+          description: Total de páginas
 
     # Esquemas de error
     Error:
@@ -1085,46 +1168,78 @@ paths:
     get:
       summary: Consultar disponibilidad de stock
       description: |
-        Obtiene la disponibilidad de stock para una o más variantes.
-        El stock se calcula automáticamente mediante un trigger en la base de datos.
+        Endpoint con dos modos de operación según los parámetros enviados.
         
-        **Implementado en HITO 2** para consulta de disponibilidad en el Quickstart.
+        **Modo 1 - Consulta por SKU (existente):** Cuando se proporciona el parámetro `sku`,
+        retorna la disponibilidad de ese único SKU. Requiere headers X-Tenant-ID y Authorization (Bearer).
+        
+        **Modo 2 - Listado completo (nuevo):** Cuando NO se proporciona `sku`, retorna un listado
+        paginado de toda la disponibilidad de stock del tenant. Usa `page` y `page_size` para paginación.
+        
+        El stock se calcula automáticamente mediante un trigger en la base de datos.
       tags:
         - Availability
       security:
         - BearerAuth: []
         - tenantId: []
       parameters:
-        - name: variant_sku
+        - name: sku
           in: query
-          description: SKU de la variante a consultar
+          description: |
+            SKU del producto/variante a consultar. Cuando se proporciona, activa el modo consulta única.
+            Cuando se omite, activa el modo listado paginado de todo el inventario del tenant.
           required: false
           schema:
             type: string
-        - name: variant_skus
-          in: query
-          description: Lista de SKUs separados por coma
-          required: false
-          schema:
-            type: string
-            example: "TALADRO-BOSCH-750W,TALADRO-BOSCH-1000W"
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/PageSizeParam'
       responses:
         '200':
-          description: Disponibilidad de stock
+          description: |
+            **Con sku:** Objeto único de disponibilidad (StockAvailability).
+            **Sin sku:** Listado paginado (AvailabilityListResponse).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AvailabilityListResponse'
-              example:
-                items:
-                  - variant_sku: "TALADRO-BOSCH-750W"
+                oneOf:
+                  - $ref: '#/components/schemas/StockAvailability'
+                  - $ref: '#/components/schemas/AvailabilityListResponse'
+              examples:
+                modoConsulta:
+                  summary: Modo consulta por SKU (con parámetro sku)
+                  value:
+                    product_sku: "TALADRO-BOSCH-750W"
+                    product_name: "Taladro Bosch 750W"
                     available_quantity: 50
                     reserved_quantity: 0
                     total_quantity: 50
-                    last_updated: "2026-02-01T10:00:00Z"
-                total_count: 1
+                    unit_of_measure: "unidad"
+                    avg_unit_cost: 15000
+                    total_value: 750000
+                    is_low_stock: false
+                    is_out_of_stock: false
+                    last_entry_at: "2026-03-14T00:00:00Z"
+                    updated_at: "2026-03-14T00:00:00Z"
+                modoListado:
+                  summary: Modo listado paginado (sin parámetro sku)
+                  value:
+                    items:
+                      - product_sku: "TALADRO-BOSCH-750W"
+                        product_name: "Taladro Bosch 750W"
+                        available_quantity: 50
+                        reserved_quantity: 0
+                        total_quantity: 50
+                        unit_of_measure: "unidad"
+                        avg_unit_cost: 15000
+                        total_value: 750000
+                        is_low_stock: false
+                        is_out_of_stock: false
+                        last_entry_at: "2026-03-14T00:00:00Z"
+                        updated_at: "2026-03-14T00:00:00Z"
+                    total_count: 1
+                    page: 1
+                    page_size: 20
+                    total_pages: 1
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

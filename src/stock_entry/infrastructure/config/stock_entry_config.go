@@ -23,26 +23,28 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 	createStockEntryUseCase := usecase.NewCreateStockEntryUseCase(stockEntryRepo)
 	bulkCreateStockEntryUseCase := usecase.NewBulkCreateStockEntryUseCase(stockEntryRepo)
 	getAvailabilityUseCase := usecase.NewGetAvailabilityUseCase(stockAvailabilityRepo)
+	listAvailabilityUseCase := usecase.NewListAvailabilityUseCase(stockAvailabilityRepo)
 	reserveStockUseCase := usecase.NewReserveStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	releaseStockUseCase := usecase.NewReleaseStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	consumeStockUseCase := usecase.NewConsumeStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	revertConsumeUseCase := usecase.NewRevertConsumeUseCase(stockAvailabilityRepo, stockEntryRepo)
 	processSaleUseCase := usecase.NewProcessSaleUseCase(stockEntryRepo, stockAvailabilityRepo)
 	listSalesUseCase := usecase.NewListSalesUseCase(stockEntryRepo)
-	compensateSaleUseCase := usecase.NewCompensateSaleUseCase(stockEntryRepo) // HITO D
-	
+	compensateSaleUseCase := usecase.NewCompensateSaleUseCase(stockEntryRepo)
+
 	// Controller
 	stockEntryController := controller.NewStockEntryController(
 		createStockEntryUseCase,
 		bulkCreateStockEntryUseCase,
 		getAvailabilityUseCase,
+		listAvailabilityUseCase,
 		reserveStockUseCase,
 		releaseStockUseCase,
 		consumeStockUseCase,
 		revertConsumeUseCase,
 		processSaleUseCase,
 		listSalesUseCase,
-		compensateSaleUseCase, // HITO D
+		compensateSaleUseCase,
 	)
 	
 	return &StockEntryConfig{

@@ -2,25 +2,27 @@ package controller
 
 import (
 	"net/http"
-	
+	"strconv"
+
 	"github.com/gin-gonic/gin"
-	
+
 	"stock/src/stock_entry/application/request"
 	"stock/src/stock_entry/application/usecase"
 )
 
 // StockEntryController maneja las peticiones HTTP para entradas de stock
 type StockEntryController struct {
-	createStockEntryUseCase     *usecase.CreateStockEntryUseCase
-	bulkCreateStockEntryUseCase *usecase.BulkCreateStockEntryUseCase
-	getAvailabilityUseCase      *usecase.GetAvailabilityUseCase
-	reserveStockUseCase         *usecase.ReserveStockUseCase
-	releaseStockUseCase         *usecase.ReleaseStockUseCase
-	consumeStockUseCase         *usecase.ConsumeStockUseCase
-	revertConsumeUseCase        *usecase.RevertConsumeUseCase
-	processSaleUseCase          *usecase.ProcessSaleUseCase
-	listSalesUseCase            *usecase.ListSalesUseCase
-	compensateSaleUseCase       *usecase.CompensateSaleUseCase // HITO D
+	createStockEntryUseCase      *usecase.CreateStockEntryUseCase
+	bulkCreateStockEntryUseCase  *usecase.BulkCreateStockEntryUseCase
+	getAvailabilityUseCase       *usecase.GetAvailabilityUseCase
+	listAvailabilityUseCase      *usecase.ListAvailabilityUseCase
+	reserveStockUseCase          *usecase.ReserveStockUseCase
+	releaseStockUseCase          *usecase.ReleaseStockUseCase
+	consumeStockUseCase          *usecase.ConsumeStockUseCase
+	revertConsumeUseCase         *usecase.RevertConsumeUseCase
+	processSaleUseCase           *usecase.ProcessSaleUseCase
+	listSalesUseCase             *usecase.ListSalesUseCase
+	compensateSaleUseCase        *usecase.CompensateSaleUseCase
 }
 
 // NewStockEntryController crea una nueva instancia del controller
@@ -28,6 +30,7 @@ func NewStockEntryController(
 	createStockEntryUseCase *usecase.CreateStockEntryUseCase,
 	bulkCreateStockEntryUseCase *usecase.BulkCreateStockEntryUseCase,
 	getAvailabilityUseCase *usecase.GetAvailabilityUseCase,
+	listAvailabilityUseCase *usecase.ListAvailabilityUseCase,
 	reserveStockUseCase *usecase.ReserveStockUseCase,
 	releaseStockUseCase *usecase.ReleaseStockUseCase,
 	consumeStockUseCase *usecase.ConsumeStockUseCase,
@@ -37,16 +40,17 @@ func NewStockEntryController(
 	compensateSaleUseCase *usecase.CompensateSaleUseCase,
 ) *StockEntryController {
 	return &StockEntryController{
-		createStockEntryUseCase:     createStockEntryUseCase,
-		bulkCreateStockEntryUseCase: bulkCreateStockEntryUseCase,
-		getAvailabilityUseCase:      getAvailabilityUseCase,
-		reserveStockUseCase:         reserveStockUseCase,
-		releaseStockUseCase:         releaseStockUseCase,
-		consumeStockUseCase:         consumeStockUseCase,
-		revertConsumeUseCase:        revertConsumeUseCase,
-		processSaleUseCase:          processSaleUseCase,
-		listSalesUseCase:            listSalesUseCase,
-		compensateSaleUseCase:       compensateSaleUseCase,
+		createStockEntryUseCase:      createStockEntryUseCase,
+		bulkCreateStockEntryUseCase:  bulkCreateStockEntryUseCase,
+		getAvailabilityUseCase:       getAvailabilityUseCase,
+		listAvailabilityUseCase:      listAvailabilityUseCase,
+		reserveStockUseCase:          reserveStockUseCase,
+		releaseStockUseCase:          releaseStockUseCase,
+		consumeStockUseCase:          consumeStockUseCase,
+		revertConsumeUseCase:         revertConsumeUseCase,
+		processSaleUseCase:           processSaleUseCase,
+		listSalesUseCase:             listSalesUseCase,
+		compensateSaleUseCase:        compensateSaleUseCase,
 	}
 }
 
@@ -105,27 +109,36 @@ func (ctrl *StockEntryController) BulkCreateStockEntries(c *gin.Context) {
 	c.JSON(statusCode, response)
 }
 
-// GetAvailability consulta la disponibilidad de un producto
+// GetAvailability consulta la disponibilidad de un producto (por SKU) o lista toda la disponibilidad del tenant
 func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
 		return
 	}
-	
+
 	productSKU := c.Query("sku")
-	if productSKU == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "sku query parameter is required"})
+
+	if productSKU != "" {
+		resp, err := ctrl.getAvailabilityUseCase.Execute(c.Request.Context(), tenantID, productSKU)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, resp)
 		return
 	}
-	
-	response, err := ctrl.getAvailabilityUseCase.Execute(c.Request.Context(), tenantID, productSKU)
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	result, err := ctrl.listAvailabilityUseCase.Execute(c.Request.Context(), tenantID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
-	c.JSON(http.StatusOK, response)
+
+	c.JSON(http.StatusOK, result)
 }
 
 // ReserveStock maneja la reserva de stock
