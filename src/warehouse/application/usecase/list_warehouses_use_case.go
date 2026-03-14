@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/warehouse/application/response"
 	"stock/src/warehouse/domain/service"
 )

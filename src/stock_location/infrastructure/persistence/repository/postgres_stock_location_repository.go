@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/stock_location/domain/entity"
 	"stock/src/stock_location/domain/exception"
 	"stock/src/stock_location/domain/port"
@@ -169,15 +169,12 @@ func (r *PostgresStockLocationRepository) Delete(ctx context.Context, id string,
 // FindByCriteria busca ubicaciones de stock según criterios
 func (r *PostgresStockLocationRepository) FindByCriteria(ctx context.Context, tenantID string, crit criteria.Criteria) ([]*entity.StockLocation, int, error) {
 	whereClause, args := r.buildWhereClause(crit.Filters, []interface{}{tenantID})
-	orderClause := r.buildOrderClause(crit.Order)
+	orderClause := r.buildOrderClause(crit.PrimaryOrder())
 	limitClause, offsetClause := "", ""
 
-	if crit.Limit != nil {
-		limitClause = fmt.Sprintf("LIMIT %d", *crit.Limit)
-	}
-
-	if crit.Offset != nil {
-		offsetClause = fmt.Sprintf("OFFSET %d", *crit.Offset)
+	if !crit.Pagination.IsEmpty() {
+		limitClause = fmt.Sprintf("LIMIT %d", crit.Pagination.Limit)
+		offsetClause = fmt.Sprintf("OFFSET %d", crit.Pagination.Offset)
 	}
 
 	query := fmt.Sprintf(`
@@ -250,46 +247,35 @@ func (r *PostgresStockLocationRepository) FindByCriteria(ctx context.Context, te
 
 // FindByWarehouseID busca ubicaciones de stock por el ID del almacén
 func (r *PostgresStockLocationRepository) FindByWarehouseID(ctx context.Context, warehouseID string, tenantID string, crit criteria.Criteria) ([]*entity.StockLocation, int, error) {
-	// Agregamos el filtro de warehouse_id a los criterios existentes
-	filters := append(crit.Filters.Items, criteria.NewFilter("warehouse_id", "=", warehouseID))
-	newCriteria := criteria.NewCriteria(
-		criteria.NewFilters(filters...),
-		crit.Order,
-		crit.Limit,
-		crit.Offset,
-	)
-
+	filters := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		filters.Add(f)
+	}
+	filters.Add(criteria.NewFilter("warehouse_id", criteria.OpEqual, warehouseID))
+	newCriteria := criteria.NewCriteria(filters, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, newCriteria)
 }
 
 // FindChildren busca ubicaciones de stock hijas de una ubicación padre
 func (r *PostgresStockLocationRepository) FindChildren(ctx context.Context, parentID string, tenantID string, crit criteria.Criteria) ([]*entity.StockLocation, int, error) {
-	// Agregamos el filtro de parent_id a los criterios existentes
-	filters := append(crit.Filters.Items, criteria.NewFilter("parent_id", "=", parentID))
-	newCriteria := criteria.NewCriteria(
-		criteria.NewFilters(filters...),
-		crit.Order,
-		crit.Limit,
-		crit.Offset,
-	)
-
+	filters := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		filters.Add(f)
+	}
+	filters.Add(criteria.NewFilter("parent_id", criteria.OpEqual, parentID))
+	newCriteria := criteria.NewCriteria(filters, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, newCriteria)
 }
 
 // FindRoots busca ubicaciones de stock de nivel raíz en un almacén
 func (r *PostgresStockLocationRepository) FindRoots(ctx context.Context, warehouseID string, tenantID string, crit criteria.Criteria) ([]*entity.StockLocation, int, error) {
-	// Creamos los filtros: warehouse_id = ? AND parent_id IS NULL
-	filters := append(crit.Filters.Items,
-		criteria.NewFilter("warehouse_id", "=", warehouseID),
-		criteria.NewFilter("parent_id", "IS", nil),
-	)
-	newCriteria := criteria.NewCriteria(
-		criteria.NewFilters(filters...),
-		crit.Order,
-		crit.Limit,
-		crit.Offset,
-	)
-
+	filters := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		filters.Add(f)
+	}
+	filters.Add(criteria.NewFilter("warehouse_id", criteria.OpEqual, warehouseID))
+	filters.Add(criteria.NewFilter("parent_id", criteria.OpIsNull, nil))
+	newCriteria := criteria.NewCriteria(filters, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, newCriteria)
 }
 
@@ -304,20 +290,17 @@ func (r *PostgresStockLocationRepository) buildWhereClause(filters criteria.Filt
 		paramIndex := len(args) + 1
 
 		switch filter.Operator {
-		case "=", ">", "<", ">=", "<=", "<>":
+		case criteria.OpEqual, criteria.OpNotEqual, criteria.OpGreaterThan, criteria.OpGreaterThanOrEqual, criteria.OpLessThan, criteria.OpLessThanOrEqual:
 			conditions = append(conditions, fmt.Sprintf("%s %s $%d", filter.Field, filter.Operator, paramIndex))
 			args = append(args, filter.Value)
-		case "LIKE":
-			conditions = append(conditions, fmt.Sprintf("%s LIKE $%d", filter.Field, paramIndex))
+		case criteria.OpLike:
+			conditions = append(conditions, fmt.Sprintf("%s ILIKE $%d", filter.Field, paramIndex))
 			args = append(args, filter.Value)
-		case "IS":
-			if filter.Value == nil {
-				conditions = append(conditions, fmt.Sprintf("%s IS NULL", filter.Field))
-			} else {
-				conditions = append(conditions, fmt.Sprintf("%s IS NOT NULL", filter.Field))
-			}
+		case criteria.OpIsNull:
+			conditions = append(conditions, fmt.Sprintf("%s IS NULL", filter.Field))
+		case criteria.OpIsNotNull:
+			conditions = append(conditions, fmt.Sprintf("%s IS NOT NULL", filter.Field))
 		default:
-			// Operador no soportado
 			continue
 		}
 	}
@@ -334,11 +317,5 @@ func (r *PostgresStockLocationRepository) buildOrderClause(order criteria.Order)
 	if order.IsEmpty() {
 		return "ORDER BY created_at DESC"
 	}
-
-	orderType := "ASC"
-	if order.OrderType == criteria.DESC {
-		orderType = "DESC"
-	}
-
-	return fmt.Sprintf("ORDER BY %s %s", order.Field, orderType)
+	return fmt.Sprintf("ORDER BY %s %s", order.Field, order.Direction)
 }

@@ -9,7 +9,7 @@ import (
 	"stock/src/location/domain/entity"
 	"stock/src/location/domain/exception"
 	"stock/src/location/domain/port"
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 // PostgresLocationRepository implementa la interfaz LocationRepository con PostgreSQL
@@ -227,17 +227,13 @@ func (r *PostgresLocationRepository) FindByCriteria(ctx context.Context, tenantI
 	}
 
 	// Agregar ORDER BY si está especificado
-	if !crit.Order.IsEmpty() {
-		selectQuery += fmt.Sprintf(" ORDER BY %s %s", crit.Order.Field, crit.Order.OrderType)
+	if order := crit.PrimaryOrder(); !order.IsEmpty() {
+		selectQuery += fmt.Sprintf(" ORDER BY %s %s", order.Field, order.Direction)
 	}
 
 	// Agregar LIMIT y OFFSET si están especificados
-	if crit.Limit != nil {
-		selectQuery += fmt.Sprintf(" LIMIT %d", *crit.Limit)
-	}
-
-	if crit.Offset != nil {
-		selectQuery += fmt.Sprintf(" OFFSET %d", *crit.Offset)
+	if !crit.Pagination.IsEmpty() {
+		selectQuery += fmt.Sprintf(" LIMIT %d OFFSET %d", crit.Pagination.Limit, crit.Pagination.Offset)
 	}
 
 	rows, err := r.db.QueryContext(ctx, selectQuery, params...)
@@ -282,22 +278,22 @@ func (r *PostgresLocationRepository) FindByCriteria(ctx context.Context, tenantI
 
 // FindStores busca solo ubicaciones de tipo tienda
 func (r *PostgresLocationRepository) FindStores(ctx context.Context, tenantID string, crit criteria.Criteria) ([]*entity.Location, int, error) {
-	// Añadir filtro de tipo = 'store'
-	storeFilter := crit.Filters
-	storeFilter.Add(criteria.NewFilter("type", "=", "store"))
-
-	storeCriteria := criteria.NewCriteria(storeFilter, crit.Order, crit.Limit, crit.Offset)
-
+	storeFilter := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		storeFilter.Add(f)
+	}
+	storeFilter.Add(criteria.NewFilter("type", criteria.OpEqual, "store"))
+	storeCriteria := criteria.NewCriteria(storeFilter, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, storeCriteria)
 }
 
 // FindDistributionCenters busca solo ubicaciones de tipo centro de distribución
 func (r *PostgresLocationRepository) FindDistributionCenters(ctx context.Context, tenantID string, crit criteria.Criteria) ([]*entity.Location, int, error) {
-	// Añadir filtro de tipo = 'distribution_center'
-	dcFilter := crit.Filters
-	dcFilter.Add(criteria.NewFilter("type", "=", "distribution_center"))
-
-	dcCriteria := criteria.NewCriteria(dcFilter, crit.Order, crit.Limit, crit.Offset)
-
+	dcFilter := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		dcFilter.Add(f)
+	}
+	dcFilter.Add(criteria.NewFilter("type", criteria.OpEqual, "distribution_center"))
+	dcCriteria := criteria.NewCriteria(dcFilter, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, dcCriteria)
 }

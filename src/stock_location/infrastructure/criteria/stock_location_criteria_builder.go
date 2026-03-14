@@ -3,23 +3,21 @@ package criteria
 import (
 	"net/url"
 
-	domainCriteria "stock/src/shared/domain/criteria"
-	sharedCriteria "stock/src/shared/infrastructure/criteria"
-
 	"github.com/gin-gonic/gin"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // StockLocationCriteriaBuilder construye criterios específicos para ubicaciones de stock
 type StockLocationCriteriaBuilder struct {
-	*domainCriteria.CriteriaBuilder
-	helper *sharedCriteria.EntityCriteriaHelper
+	*crit.CriteriaBuilder
+	helper *crit.EntityCriteriaHelper
 }
 
 // NewStockLocationCriteriaBuilder crea un nuevo builder para criterios de ubicaciones de stock
 func NewStockLocationCriteriaBuilder() *StockLocationCriteriaBuilder {
 	return &StockLocationCriteriaBuilder{
-		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
-		helper:          sharedCriteria.NewEntityCriteriaHelper(),
+		CriteriaBuilder: crit.NewCriteriaBuilder(),
+		helper:          crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -35,7 +33,7 @@ func (b *StockLocationCriteriaBuilder) BuildFromContext(c *gin.Context) *StockLo
 }
 
 // BuildValidated construye y valida criterios desde el contexto
-func (b *StockLocationCriteriaBuilder) BuildValidated(c *gin.Context) domainCriteria.Criteria {
+func (b *StockLocationCriteriaBuilder) BuildValidated(c *gin.Context) crit.Criteria {
 	criteria := b.BuildFromContext(c).Build()
 	return b.helper.ValidateAndSanitizeCriteria(criteria, b.GetAllowedFields())
 }
@@ -86,11 +84,11 @@ func (b *StockLocationCriteriaBuilder) addStockLocationFilters(values url.Values
 
 	// Filtro por capacidad
 	if minCapacity := values.Get("min_capacity"); minCapacity != "" {
-		b.AddFilter("capacity", domainCriteria.OpGreaterThanOrEqual, minCapacity)
+		b.AddFilter("capacity", crit.OpGreaterThanOrEqual, minCapacity)
 	}
 
 	if maxCapacity := values.Get("max_capacity"); maxCapacity != "" {
-		b.AddFilter("capacity", domainCriteria.OpLessThanOrEqual, maxCapacity)
+		b.AddFilter("capacity", crit.OpLessThanOrEqual, maxCapacity)
 	}
 }
 
@@ -118,8 +116,8 @@ func (b *StockLocationCriteriaBuilder) GetDefaultSortField() string {
 }
 
 // GetDefaultSortDirection retorna la dirección de ordenamiento por defecto
-func (b *StockLocationCriteriaBuilder) GetDefaultSortDirection() domainCriteria.OrderType {
-	return domainCriteria.ASC
+func (b *StockLocationCriteriaBuilder) GetDefaultSortDirection() crit.OrderDirection {
+	return crit.OrderAsc
 }
 
 // Métodos de filtrado específicos

@@ -7,7 +7,7 @@ import (
 	"stock/src/location/application/request"
 	"stock/src/location/application/usecase"
 	"stock/src/location/domain/entity"
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/test/location/domain/mother"
 
 	"github.com/google/uuid"

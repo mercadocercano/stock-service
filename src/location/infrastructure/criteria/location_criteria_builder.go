@@ -3,23 +3,21 @@ package criteria
 import (
 	"net/url"
 
-	domainCriteria "stock/src/shared/domain/criteria"
-	sharedCriteria "stock/src/shared/infrastructure/criteria"
-
 	"github.com/gin-gonic/gin"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // LocationCriteriaBuilder construye criterios específicos para ubicaciones
 type LocationCriteriaBuilder struct {
-	*domainCriteria.CriteriaBuilder
-	helper *sharedCriteria.EntityCriteriaHelper
+	*crit.CriteriaBuilder
+	helper *crit.EntityCriteriaHelper
 }
 
 // NewLocationCriteriaBuilder crea un nuevo builder para criterios de ubicaciones
 func NewLocationCriteriaBuilder() *LocationCriteriaBuilder {
 	return &LocationCriteriaBuilder{
-		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
-		helper:          sharedCriteria.NewEntityCriteriaHelper(),
+		CriteriaBuilder: crit.NewCriteriaBuilder(),
+		helper:          crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -35,7 +33,7 @@ func (b *LocationCriteriaBuilder) BuildFromContext(c *gin.Context) *LocationCrit
 }
 
 // BuildValidated construye y valida criterios desde el contexto
-func (b *LocationCriteriaBuilder) BuildValidated(c *gin.Context) domainCriteria.Criteria {
+func (b *LocationCriteriaBuilder) BuildValidated(c *gin.Context) crit.Criteria {
 	criteria := b.BuildFromContext(c).Build()
 	return b.helper.ValidateAndSanitizeCriteria(criteria, b.GetAllowedFields())
 }
@@ -112,8 +110,8 @@ func (b *LocationCriteriaBuilder) GetDefaultSortField() string {
 }
 
 // GetDefaultSortDirection retorna la dirección de ordenamiento por defecto
-func (b *LocationCriteriaBuilder) GetDefaultSortDirection() domainCriteria.OrderType {
-	return domainCriteria.DESC
+func (b *LocationCriteriaBuilder) GetDefaultSortDirection() crit.OrderDirection {
+	return crit.OrderDesc
 }
 
 // Métodos de filtrado específicos

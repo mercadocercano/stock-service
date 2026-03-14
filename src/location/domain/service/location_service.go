@@ -5,7 +5,7 @@ import (
 
 	"stock/src/location/domain/entity"
 	"stock/src/location/domain/port"
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 // LocationService representa el servicio de dominio para las ubicaciones

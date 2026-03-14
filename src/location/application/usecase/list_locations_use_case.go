@@ -5,7 +5,7 @@ import (
 
 	"stock/src/location/application/response"
 	"stock/src/location/domain/service"
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 // ListLocationsUseCase define el caso de uso para listar ubicaciones

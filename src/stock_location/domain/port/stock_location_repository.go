@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/stock_location/domain/entity"
 )
 

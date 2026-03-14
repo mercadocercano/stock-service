@@ -3,23 +3,21 @@ package criteria
 import (
 	"net/url"
 
-	domainCriteria "stock/src/shared/domain/criteria"
-	sharedCriteria "stock/src/shared/infrastructure/criteria"
-
 	"github.com/gin-gonic/gin"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // WarehouseCriteriaBuilder construye criterios específicos para almacenes
 type WarehouseCriteriaBuilder struct {
-	*domainCriteria.CriteriaBuilder
-	helper *sharedCriteria.EntityCriteriaHelper
+	*crit.CriteriaBuilder
+	helper *crit.EntityCriteriaHelper
 }
 
 // NewWarehouseCriteriaBuilder crea un nuevo builder para criterios de almacenes
 func NewWarehouseCriteriaBuilder() *WarehouseCriteriaBuilder {
 	return &WarehouseCriteriaBuilder{
-		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
-		helper:          sharedCriteria.NewEntityCriteriaHelper(),
+		CriteriaBuilder: crit.NewCriteriaBuilder(),
+		helper:          crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -35,7 +33,7 @@ func (b *WarehouseCriteriaBuilder) BuildFromContext(c *gin.Context) *WarehouseCr
 }
 
 // BuildValidated construye y valida criterios desde el contexto
-func (b *WarehouseCriteriaBuilder) BuildValidated(c *gin.Context) domainCriteria.Criteria {
+func (b *WarehouseCriteriaBuilder) BuildValidated(c *gin.Context) crit.Criteria {
 	criteria := b.BuildFromContext(c).Build()
 	return b.helper.ValidateAndSanitizeCriteria(criteria, b.GetAllowedFields())
 }
@@ -81,11 +79,11 @@ func (b *WarehouseCriteriaBuilder) addWarehouseFilters(values url.Values) {
 
 	// Filtros de capacidad (si el almacén tiene campos de capacidad)
 	if minCapacity := values.Get("min_capacity"); minCapacity != "" {
-		b.AddFilter("capacity", domainCriteria.OpGreaterThanOrEqual, minCapacity)
+		b.AddFilter("capacity", crit.OpGreaterThanOrEqual, minCapacity)
 	}
 
 	if maxCapacity := values.Get("max_capacity"); maxCapacity != "" {
-		b.AddFilter("capacity", domainCriteria.OpLessThanOrEqual, maxCapacity)
+		b.AddFilter("capacity", crit.OpLessThanOrEqual, maxCapacity)
 	}
 
 	// Filtro de prioridad
@@ -118,8 +116,8 @@ func (b *WarehouseCriteriaBuilder) GetDefaultSortField() string {
 }
 
 // GetDefaultSortDirection retorna la dirección de ordenamiento por defecto
-func (b *WarehouseCriteriaBuilder) GetDefaultSortDirection() domainCriteria.OrderType {
-	return domainCriteria.DESC
+func (b *WarehouseCriteriaBuilder) GetDefaultSortDirection() crit.OrderDirection {
+	return crit.OrderDesc
 }
 
 // Métodos de filtrado específicos

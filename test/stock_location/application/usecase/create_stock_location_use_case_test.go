@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/stock_location/application/request"
 	"stock/src/stock_location/application/usecase"
 	"stock/src/stock_location/domain/entity"

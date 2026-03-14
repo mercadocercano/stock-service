@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/warehouse/domain/entity"
 )
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"stock/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"stock/src/warehouse/domain/entity"
 	"stock/src/warehouse/domain/exception"
 	"stock/src/warehouse/domain/port"
@@ -224,17 +224,13 @@ func (r *PostgresWarehouseRepository) FindByCriteria(ctx context.Context, tenant
 	}
 
 	// Agregar ORDER BY si está especificado
-	if !crit.Order.IsEmpty() {
-		selectQuery += fmt.Sprintf(" ORDER BY %s %s", crit.Order.Field, crit.Order.OrderType)
+	if order := crit.PrimaryOrder(); !order.IsEmpty() {
+		selectQuery += fmt.Sprintf(" ORDER BY %s %s", order.Field, order.Direction)
 	}
 
 	// Agregar LIMIT y OFFSET si están especificados
-	if crit.Limit != nil {
-		selectQuery += fmt.Sprintf(" LIMIT %d", *crit.Limit)
-	}
-
-	if crit.Offset != nil {
-		selectQuery += fmt.Sprintf(" OFFSET %d", *crit.Offset)
+	if !crit.Pagination.IsEmpty() {
+		selectQuery += fmt.Sprintf(" LIMIT %d OFFSET %d", crit.Pagination.Limit, crit.Pagination.Offset)
 	}
 
 	rows, err := r.db.QueryContext(ctx, selectQuery, params...)
@@ -281,11 +277,11 @@ func (r *PostgresWarehouseRepository) FindByCriteria(ctx context.Context, tenant
 
 // FindByLocationID busca almacenes por el ID de su ubicación
 func (r *PostgresWarehouseRepository) FindByLocationID(ctx context.Context, locationID string, tenantID string, crit criteria.Criteria) ([]*entity.Warehouse, int, error) {
-	// Crear nuevos criterios con el filtro de location_id
-	locationFilter := crit.Filters
-	locationFilter.Add(criteria.NewFilter("location_id", "=", locationID))
-
-	locationCriteria := criteria.NewCriteria(locationFilter, crit.Order, crit.Limit, crit.Offset)
-
+	locationFilter := criteria.NewFilters()
+	for _, f := range crit.Filters.Items {
+		locationFilter.Add(f)
+	}
+	locationFilter.Add(criteria.NewFilter("location_id", criteria.OpEqual, locationID))
+	locationCriteria := criteria.NewCriteria(locationFilter, crit.Orders, crit.Pagination)
 	return r.FindByCriteria(ctx, tenantID, locationCriteria)
 }
