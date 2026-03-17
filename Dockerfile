@@ -11,6 +11,11 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
+# Configure private Go modules
+ARG GITHUB_TOKEN
+ENV GOPRIVATE=github.com/mercadocercano/*
+RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi
+
 # Copy dependency files and download modules
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
@@ -58,6 +63,11 @@ RUN apk add --no-cache \
 RUN go install github.com/cosmtrek/air@v1.49.0
 
 WORKDIR /app
+
+# Configure private Go modules
+ARG GITHUB_TOKEN
+ENV GOPRIVATE=github.com/mercadocercano/*
+RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi
 
 # Copy go mod files first (for better caching)
 COPY --chown=appuser:appgroup go.mod go.sum ./
