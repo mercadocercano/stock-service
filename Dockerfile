@@ -16,6 +16,10 @@ ARG GITHUB_TOKEN
 ENV GOPRIVATE=github.com/mercadocercano/*
 RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi
 
+# Copy shared libs (injected via additional_contexts)
+COPY --from=libs-criteria /. /libs/criteria/
+COPY --from=libs-middleware /. /libs/middleware/
+
 # Copy dependency files and download modules
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
@@ -68,6 +72,10 @@ WORKDIR /app
 ARG GITHUB_TOKEN
 ENV GOPRIVATE=github.com/mercadocercano/*
 RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi
+
+# Copy shared libs (injected via additional_contexts)
+COPY --from=libs-criteria /. /libs/criteria/
+COPY --from=libs-middleware /. /libs/middleware/
 
 # Copy go mod files first (for better caching)
 COPY --chown=appuser:appgroup go.mod go.sum ./
