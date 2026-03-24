@@ -14,10 +14,6 @@ require (
 	github.com/stretchr/testify v1.9.0
 )
 
-replace (
-	github.com/mercadocercano/criteria => /libs/criteria
-	github.com/mercadocercano/middleware => /libs/middleware
-)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
