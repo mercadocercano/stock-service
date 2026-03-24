@@ -94,7 +94,8 @@ func main() {
 	r.Use(prometheusMiddleware()) // Agregar middleware para métricas
 
 	// Rutas principales
-	r.GET("/health", func(c *gin.Context) {
+	r.GET("/health",
+			"/api/v1/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "UP",
 		})
