@@ -80,9 +80,10 @@ RUN go mod download
 # Copy source code
 COPY --chown=appuser:appgroup . .
 
-# Create tmp directory for Air
-RUN mkdir -p tmp scripts migrations logs && \
-    chown -R appuser:appgroup tmp scripts migrations logs
+# Create directories and fix permissions for Air + Go mod cache
+RUN mkdir -p tmp scripts migrations logs /go/pkg/mod && \
+    chmod -R 777 /go/pkg && \
+    chown -R appuser:appgroup /app tmp scripts migrations logs
 
 # Switch to non-root user
 USER appuser
@@ -94,8 +95,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose ports
 EXPOSE 8080 2114
 
-# Use Air for hot reload in development
-CMD ["air", "-c", ".air.toml"]
+CMD sh -c 'if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi && air -c .air.toml'
 
 # ==============================================
 # Stage 4: Migrate stage (Alpine + psql para Job K8s)
