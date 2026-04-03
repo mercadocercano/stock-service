@@ -135,7 +135,7 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 // FindByID busca una entrada por ID
 func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) (*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
@@ -179,7 +179,7 @@ func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUI
 // FindByTenantAndSKU busca entradas por tenant y variant SKU
 func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) ([]*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
@@ -228,7 +228,7 @@ func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, t
 // FindByTenant busca entradas por tenant con paginación
 func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*entity.StockEntry, error) {
 	query := `
-		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
 			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
 			   reference_number, notes, status, is_active, created_at, updated_at
 		FROM stock_entries
@@ -543,7 +543,7 @@ func NewPostgresStockAvailabilityRepository(db *sql.DB) port.StockAvailabilityRe
 // FindByTenantAndSKU busca disponibilidad por tenant y variant SKU (HITO 2.1)
 func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) (*entity.StockAvailability, error) {
 	query := `
-		SELECT id, tenant_id, variant_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
 			   available_quantity, reserved_quantity, total_quantity, unit_of_measure,
 			   avg_unit_cost, total_value, min_stock_level, max_stock_level,
 			   is_low_stock, is_out_of_stock, last_entry_at, updated_at
@@ -592,7 +592,7 @@ func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Con
 // FindByTenant busca disponibilidad por tenant
 func (r *PostgresStockAvailabilityRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*entity.StockAvailability, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
 			   available_quantity, reserved_quantity, total_quantity, unit_of_measure,
 			   avg_unit_cost, total_value, min_stock_level, max_stock_level,
 			   is_low_stock, is_out_of_stock, last_entry_at, updated_at
@@ -640,7 +640,7 @@ func (r *PostgresStockAvailabilityRepository) CountByTenant(ctx context.Context,
 // FindLowStock busca productos con bajo stock
 func (r *PostgresStockAvailabilityRepository) FindLowStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
 			   available_quantity, reserved_quantity, total_quantity, unit_of_measure,
 			   avg_unit_cost, total_value, min_stock_level, max_stock_level,
 			   is_low_stock, is_out_of_stock, last_entry_at, updated_at
@@ -676,7 +676,7 @@ func (r *PostgresStockAvailabilityRepository) FindLowStock(ctx context.Context, 
 // FindOutOfStock busca productos sin stock
 func (r *PostgresStockAvailabilityRepository) FindOutOfStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error) {
 	query := `
-		SELECT id, tenant_id, product_sku, product_id, product_name, location_id,
+		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
 			   available_quantity, reserved_quantity, total_quantity, unit_of_measure,
 			   avg_unit_cost, total_value, min_stock_level, max_stock_level,
 			   is_low_stock, is_out_of_stock, last_entry_at, updated_at
