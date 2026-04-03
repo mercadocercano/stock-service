@@ -55,3 +55,5 @@ tmp/
 .gitconfig
 *-management/
 .cursorrules
+api
+tmp/
