@@ -94,12 +94,13 @@ func main() {
 	r.Use(prometheusMiddleware()) // Agregar middleware para métricas
 
 	// Rutas principales
-	r.GET("/health",
-			"/api/v1/health", func(c *gin.Context) {
+	healthHandler := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "UP",
 		})
-	})
+	}
+	r.GET("/health", healthHandler)
+	r.GET("/api/v1/health", healthHandler)
 
 	// Endpoint para métricas directamente en el servicio
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
