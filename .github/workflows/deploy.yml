@@ -3,6 +3,7 @@ name: Deploy stock-service to Production
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 env:
   REGISTRY: registry.digitalocean.com/mc-bootstrap-registry
