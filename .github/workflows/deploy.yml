@@ -2,7 +2,7 @@ name: Deploy stock-service to Production
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -39,10 +39,11 @@ jobs:
         run: go vet ./...
 
       - name: Login to DigitalOcean Container Registry
-        run: |
-          mkdir -p ~/.docker
-          curl -s "https://api.digitalocean.com/v2/registries/mc-bootstrap-registry/docker-credentials?read_write=true&expiry_seconds=900" \
-            -H "Authorization: Bearer ${{ secrets.DOCR_TOKEN }}" > ~/.docker/config.json
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DOCR_TOKEN }}
+          password: ${{ secrets.DOCR_TOKEN }}
 
       - name: Build and Push Image (linux/amd64)
         uses: docker/build-push-action@v5
