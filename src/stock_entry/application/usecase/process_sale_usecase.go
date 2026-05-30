@@ -91,6 +91,8 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 	// Leer stock actualizado (post-commit del trigger)
 	availability, err := uc.availabilityRepo.FindByTenantAndSKU(ctx, tenantUUID, req.VariantSKU)
 	if err != nil {
+		// S001: emit movement even if availability read fails
+		metrics.MCStockMovementsTotal.WithLabelValues(tenantID, "sale").Inc()
 		// Si la venta se procesó correctamente pero no podemos leer availability,
 		// aún retornamos success pero sin remaining stock
 		return &response.ProcessSaleResponse{
@@ -102,6 +104,10 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 			Timestamp:    time.Now().UTC(),
 		}, nil
 	}
+
+	// S001: actualizar nivel de stock y contar movimiento
+	metrics.MCStockLevel.WithLabelValues(tenantID, req.VariantSKU).Set(availability.AvailableQuantity)
+	metrics.MCStockMovementsTotal.WithLabelValues(tenantID, "sale").Inc()
 
 	return &response.ProcessSaleResponse{
 		Success:        true,
