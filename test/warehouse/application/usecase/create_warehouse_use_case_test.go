@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 	"stock/src/warehouse/application/request"
 	"stock/src/warehouse/application/usecase"
 	"stock/src/warehouse/domain/entity"

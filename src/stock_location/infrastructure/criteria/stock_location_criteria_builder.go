@@ -4,7 +4,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	crit "github.com/mercadocercano/criteria"
+	crit "github.com/hornosg/go-shared/criteria"
 )
 
 // StockLocationCriteriaBuilder construye criterios específicos para ubicaciones de stock

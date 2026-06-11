@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 	"stock/src/stock_location/domain/entity"
 	"stock/src/stock_location/domain/port"
 )

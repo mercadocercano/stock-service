@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 	"stock/src/warehouse/domain/entity"
 	"stock/src/warehouse/domain/exception"
 	"stock/src/warehouse/domain/port"

@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 	"stock/src/stock_location/application/response"
 	"stock/src/stock_location/domain/service"
 )

@@ -5,7 +5,7 @@ import (
 
 	"stock/src/location/application/response"
 	"stock/src/location/domain/service"
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 )
 
 // ListLocationsUseCase define el caso de uso para listar ubicaciones

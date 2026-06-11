@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 	"stock/src/stock_location/domain/entity"
 )
 

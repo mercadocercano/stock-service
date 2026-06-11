@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"stock/src/location/domain/entity"
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 )
 
 // LocationRepository define las operaciones disponibles para el repositorio de ubicaciones

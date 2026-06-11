@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"stock/src/location/domain/entity"
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 )
 
 // LocationServiceInterface define la interfaz del servicio de ubicaciones

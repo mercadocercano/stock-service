@@ -9,7 +9,7 @@ import (
 	"stock/src/location/domain/entity"
 	"stock/src/location/domain/exception"
 	"stock/src/location/domain/port"
-	"github.com/mercadocercano/criteria"
+	"github.com/hornosg/go-shared/criteria"
 )
 
 // PostgresLocationRepository implementa la interfaz LocationRepository con PostgreSQL
