@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hornosg/go-shared/infrastructure/env"
 	tenantmw "github.com/hornosg/go-shared/infrastructure/middleware"
-	_ "github.com/lib/pq" // Driver de PostgreSQL
+	goshpostgres "github.com/hornosg/go-shared/infrastructure/postgres"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -59,22 +60,21 @@ func main() {
 	dbPassword := env.Get("DB_PASSWORD", "postgres")
 	dbName := env.Get("DB_NAME", "stock_db")
 
-	// Crear string de conexión
-	connStr := "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=disable"
+	// Conectar a la base de datos usando el helper compartido
 	log.Printf("Intentando conectar a postgres://%s:***@%s:%s/%s", dbUser, dbHost, dbPort, dbName)
-
-	// Conectar a la base de datos
-	db, err := sql.Open("postgres", connStr)
+	db, err := goshpostgres.Connect(goshpostgres.Config{
+		Host:     dbHost,
+		Port:     dbPort,
+		User:     dbUser,
+		Password: dbPassword,
+		DBName:   dbName,
+		SSLMode:  "disable",
+	})
 	if err != nil {
 		log.Fatalf("Error al conectar a la base de datos: %v", err)
 	}
 	defer db.Close()
-
-	// Comprobar la conexión
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Error al verificar la conexión a la base de datos: %v", err)
-	}
+	goshpostgres.StartPoolMonitor(context.Background(), db, goshpostgres.MonitorOptions{Service: "stock-service", DBName: dbName})
 	log.Println("Conexión a la base de datos establecida con éxito")
 
 	// API v1 grupo de rutas
