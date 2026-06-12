@@ -57,3 +57,7 @@ tmp/
 .cursorrules
 api
 tmp/
+
+# Engram
+.engram/engram.db
+.engram/*.db-*
