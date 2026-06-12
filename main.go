@@ -8,25 +8,17 @@ import (
 	apiConfig "stock/src/api/config"
 	locationConfig "stock/src/location/infrastructure/config"
 	sharedConfig "stock/src/shared/infrastructure/config"
-	stockLocationConfig "stock/src/stock_location/infrastructure/config"
 	stockEntryConfig "stock/src/stock_entry/infrastructure/config"
 	_ "stock/src/stock_entry/infrastructure/metrics" // H8: Registra stock_insufficient_total
+	stockLocationConfig "stock/src/stock_location/infrastructure/config"
 	warehouseConfig "stock/src/warehouse/infrastructure/config"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq" // Driver de PostgreSQL
+	"github.com/hornosg/go-shared/infrastructure/env"
 	tenantmw "github.com/hornosg/go-shared/infrastructure/middleware"
+	_ "github.com/lib/pq" // Driver de PostgreSQL
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-// getEnv obtiene una variable de entorno o devuelve un valor por defecto
-func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
 
 func main() {
 	// Configurar el router con Gin
@@ -61,11 +53,11 @@ func main() {
 	sharedConfig.SetupSharedMiddleware(router, gzipSharedCfg)
 
 	// Obtener configuración de la base de datos de variables de entorno
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "stock_db")
+	dbHost := env.Get("DB_HOST", "localhost")
+	dbPort := env.Get("DB_PORT", "5432")
+	dbUser := env.Get("DB_USER", "postgres")
+	dbPassword := env.Get("DB_PASSWORD", "postgres")
+	dbName := env.Get("DB_NAME", "stock_db")
 
 	// Crear string de conexión
 	connStr := "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=disable"
@@ -187,4 +179,5 @@ func setupStockEntryModule(router *gin.RouterGroup, db *sql.DB) {
 	log.Println("  GET    /api/v1/availability")
 	log.Println("  POST   /api/v1/sale              (minimal mock endpoint)")
 }
+
 // Test change for git hook
