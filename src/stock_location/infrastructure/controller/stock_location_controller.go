@@ -9,6 +9,7 @@ import (
 	"stock/src/stock_location/infrastructure/criteria"
 
 	"github.com/gin-gonic/gin"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 )
 
 // StockLocationController maneja las peticiones HTTP relacionadas con ubicaciones de stock
@@ -74,14 +75,14 @@ func (c *StockLocationController) CreateStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 	req.TenantID = tenantID.(string)
 
 	// Parsear el cuerpo de la petición
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -92,9 +93,9 @@ func (c *StockLocationController) CreateStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -112,7 +113,7 @@ func (c *StockLocationController) ListStockLocations(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -131,7 +132,7 @@ func (c *StockLocationController) ListStockLocations(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -144,14 +145,14 @@ func (c *StockLocationController) GetStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de stock de los parámetros de la URL
 	stockLocationID := ctx.Param("id")
 	if stockLocationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Stock Location ID is required")
 		return
 	}
 
@@ -162,9 +163,9 @@ func (c *StockLocationController) GetStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -178,21 +179,21 @@ func (c *StockLocationController) UpdateStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de stock de los parámetros de la URL
 	stockLocationID := ctx.Param("id")
 	if stockLocationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Stock Location ID is required")
 		return
 	}
 
 	// Parsear el cuerpo de la petición
 	var req request.UpdateStockLocationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -203,9 +204,9 @@ func (c *StockLocationController) UpdateStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -219,14 +220,14 @@ func (c *StockLocationController) ActivateStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de stock de los parámetros de la URL
 	stockLocationID := ctx.Param("id")
 	if stockLocationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Stock Location ID is required")
 		return
 	}
 
@@ -237,9 +238,9 @@ func (c *StockLocationController) ActivateStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -253,14 +254,14 @@ func (c *StockLocationController) DeactivateStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de stock de los parámetros de la URL
 	stockLocationID := ctx.Param("id")
 	if stockLocationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Stock Location ID is required")
 		return
 	}
 
@@ -271,9 +272,9 @@ func (c *StockLocationController) DeactivateStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -287,14 +288,14 @@ func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de stock de los parámetros de la URL
 	stockLocationID := ctx.Param("id")
 	if stockLocationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Stock Location ID is required")
 		return
 	}
 
@@ -305,9 +306,9 @@ func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.StockLocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -325,7 +326,7 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -333,7 +334,7 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 	// Obtener el ID del almacén de los parámetros de la URL
 	warehouseID := ctx.Param("warehouse_id")
 	if warehouseID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Warehouse ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Warehouse ID is required")
 		return
 	}
 
@@ -351,7 +352,7 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -368,7 +369,7 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -376,7 +377,7 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 	// Obtener el ID del almacén de los parámetros de la URL
 	warehouseID := ctx.Param("warehouse_id")
 	if warehouseID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Warehouse ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Warehouse ID is required")
 		return
 	}
 
@@ -394,7 +395,7 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -411,7 +412,7 @@ func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -419,7 +420,7 @@ func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
 	// Obtener el ID de la ubicación padre de los parámetros de la URL
 	parentID := ctx.Param("id")
 	if parentID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Parent Stock Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Parent Stock Location ID is required")
 		return
 	}
 
@@ -437,7 +438,7 @@ func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"stock/src/stock_entry/application/request"
 	"stock/src/stock_entry/application/usecase"
@@ -12,17 +13,17 @@ import (
 
 // StockEntryController maneja las peticiones HTTP para entradas de stock
 type StockEntryController struct {
-	createStockEntryUseCase      *usecase.CreateStockEntryUseCase
-	bulkCreateStockEntryUseCase  *usecase.BulkCreateStockEntryUseCase
-	getAvailabilityUseCase       *usecase.GetAvailabilityUseCase
-	listAvailabilityUseCase      *usecase.ListAvailabilityUseCase
-	reserveStockUseCase          *usecase.ReserveStockUseCase
-	releaseStockUseCase          *usecase.ReleaseStockUseCase
-	consumeStockUseCase          *usecase.ConsumeStockUseCase
-	revertConsumeUseCase         *usecase.RevertConsumeUseCase
-	processSaleUseCase           *usecase.ProcessSaleUseCase
-	listSalesUseCase             *usecase.ListSalesUseCase
-	compensateSaleUseCase        *usecase.CompensateSaleUseCase
+	createStockEntryUseCase     *usecase.CreateStockEntryUseCase
+	bulkCreateStockEntryUseCase *usecase.BulkCreateStockEntryUseCase
+	getAvailabilityUseCase      *usecase.GetAvailabilityUseCase
+	listAvailabilityUseCase     *usecase.ListAvailabilityUseCase
+	reserveStockUseCase         *usecase.ReserveStockUseCase
+	releaseStockUseCase         *usecase.ReleaseStockUseCase
+	consumeStockUseCase         *usecase.ConsumeStockUseCase
+	revertConsumeUseCase        *usecase.RevertConsumeUseCase
+	processSaleUseCase          *usecase.ProcessSaleUseCase
+	listSalesUseCase            *usecase.ListSalesUseCase
+	compensateSaleUseCase       *usecase.CompensateSaleUseCase
 }
 
 // NewStockEntryController crea una nueva instancia del controller
@@ -40,17 +41,17 @@ func NewStockEntryController(
 	compensateSaleUseCase *usecase.CompensateSaleUseCase,
 ) *StockEntryController {
 	return &StockEntryController{
-		createStockEntryUseCase:      createStockEntryUseCase,
-		bulkCreateStockEntryUseCase:  bulkCreateStockEntryUseCase,
-		getAvailabilityUseCase:       getAvailabilityUseCase,
-		listAvailabilityUseCase:      listAvailabilityUseCase,
-		reserveStockUseCase:          reserveStockUseCase,
-		releaseStockUseCase:          releaseStockUseCase,
-		consumeStockUseCase:          consumeStockUseCase,
-		revertConsumeUseCase:         revertConsumeUseCase,
-		processSaleUseCase:           processSaleUseCase,
-		listSalesUseCase:             listSalesUseCase,
-		compensateSaleUseCase:        compensateSaleUseCase,
+		createStockEntryUseCase:     createStockEntryUseCase,
+		bulkCreateStockEntryUseCase: bulkCreateStockEntryUseCase,
+		getAvailabilityUseCase:      getAvailabilityUseCase,
+		listAvailabilityUseCase:     listAvailabilityUseCase,
+		reserveStockUseCase:         reserveStockUseCase,
+		releaseStockUseCase:         releaseStockUseCase,
+		consumeStockUseCase:         consumeStockUseCase,
+		revertConsumeUseCase:        revertConsumeUseCase,
+		processSaleUseCase:          processSaleUseCase,
+		listSalesUseCase:            listSalesUseCase,
+		compensateSaleUseCase:       compensateSaleUseCase,
 	}
 }
 
@@ -58,24 +59,24 @@ func NewStockEntryController(
 func (ctrl *StockEntryController) CreateStockEntry(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
-	
+
 	var req request.CreateStockEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
-	
+
 	req.TenantID = tenantID
-	
+
 	response, err := ctrl.createStockEntryUseCase.Execute(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -83,29 +84,29 @@ func (ctrl *StockEntryController) CreateStockEntry(c *gin.Context) {
 func (ctrl *StockEntryController) BulkCreateStockEntries(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
-	
+
 	var req request.BulkCreateStockEntriesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
-	
+
 	req.TenantID = tenantID
-	
+
 	response, err := ctrl.bulkCreateStockEntryUseCase.Execute(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	statusCode := http.StatusCreated
 	if !response.Success {
 		statusCode = http.StatusPartialContent
 	}
-	
+
 	c.JSON(statusCode, response)
 }
 
@@ -113,7 +114,7 @@ func (ctrl *StockEntryController) BulkCreateStockEntries(c *gin.Context) {
 func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
@@ -122,7 +123,7 @@ func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 	if productSKU != "" {
 		resp, err := ctrl.getAvailabilityUseCase.Execute(c.Request.Context(), tenantID, productSKU)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusNotFound, err.Error())
 			return
 		}
 		c.JSON(http.StatusOK, resp)
@@ -134,7 +135,7 @@ func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 
 	result, err := ctrl.listAvailabilityUseCase.Execute(c.Request.Context(), tenantID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -145,13 +146,13 @@ func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 func (ctrl *StockEntryController) ReserveStock(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.ReserveStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
@@ -159,10 +160,10 @@ func (ctrl *StockEntryController) ReserveStock(c *gin.Context) {
 	if err != nil {
 		// Manejar error de stock insuficiente
 		if err.Error() == "insufficient stock" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Insufficient stock available"})
+			httpresp.JSON(c, http.StatusConflict, "Insufficient stock available")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -173,13 +174,13 @@ func (ctrl *StockEntryController) ReserveStock(c *gin.Context) {
 func (ctrl *StockEntryController) ReleaseStock(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.ReleaseStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
@@ -187,10 +188,10 @@ func (ctrl *StockEntryController) ReleaseStock(c *gin.Context) {
 	if err != nil {
 		// Manejar error de stock reservado insuficiente
 		if contains(err.Error(), "insufficient reserved stock") {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusConflict, err.Error())
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -204,28 +205,28 @@ func (ctrl *StockEntryController) RegisterRoutes(router *gin.RouterGroup) {
 		stockEntries.POST("", ctrl.CreateStockEntry)
 		stockEntries.POST("/bulk", ctrl.BulkCreateStockEntries)
 	}
-	
+
 	// Endpoint de disponibilidad
 	router.GET("/availability", ctrl.GetAvailability)
-	
+
 	// Endpoint de reserva
 	router.POST("/reserve", ctrl.ReserveStock)
-	
+
 	// Endpoint de liberación
 	router.POST("/release", ctrl.ReleaseStock)
-	
+
 	// Endpoint de consumo
 	router.POST("/consume", ctrl.ConsumeStock)
-	
+
 	// Endpoint de reversión de consumo
 	router.POST("/revert-consume", ctrl.RevertConsume)
-	
+
 	// Endpoint de venta (minimal mock)
 	router.POST("/sale", ctrl.ProcessSale)
-	
+
 	// Endpoint de listado de ventas (reporte POS)
 	router.GET("/sales", ctrl.ListSales)
-	
+
 	// Endpoint de compensación (HITO D)
 	router.POST("/compensate-sale", ctrl.CompensateSale)
 }
@@ -235,19 +236,19 @@ func (ctrl *StockEntryController) RegisterRoutes(router *gin.RouterGroup) {
 func (ctrl *StockEntryController) CompensateSale(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.CompensateSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	response, err := ctrl.compensateSaleUseCase.Execute(c.Request.Context(), tenantID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -258,19 +259,19 @@ func (ctrl *StockEntryController) CompensateSale(c *gin.Context) {
 func (ctrl *StockEntryController) RevertConsume(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.RevertConsumeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	response, err := ctrl.revertConsumeUseCase.Execute(c.Request.Context(), tenantID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -281,13 +282,13 @@ func (ctrl *StockEntryController) RevertConsume(c *gin.Context) {
 func (ctrl *StockEntryController) ConsumeStock(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.ConsumeStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
@@ -295,10 +296,10 @@ func (ctrl *StockEntryController) ConsumeStock(c *gin.Context) {
 	if err != nil {
 		// Manejar error de stock reservado insuficiente
 		if contains(err.Error(), "insufficient reserved stock") {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusConflict, err.Error())
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -309,19 +310,19 @@ func (ctrl *StockEntryController) ConsumeStock(c *gin.Context) {
 func (ctrl *StockEntryController) ProcessSale(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
 	var req request.ProcessSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	response, err := ctrl.processSaleUseCase.Execute(c.Request.Context(), tenantID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -338,7 +339,7 @@ func (ctrl *StockEntryController) ProcessSale(c *gin.Context) {
 func (ctrl *StockEntryController) ListSales(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
 		return
 	}
 
@@ -348,12 +349,12 @@ func (ctrl *StockEntryController) ListSales(c *gin.Context) {
 
 	sales, err := ctrl.listSalesUseCase.Execute(c.Request.Context(), tenantID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"items": sales,
+		"items":       sales,
 		"total_count": len(sales),
 	})
 }
@@ -367,4 +368,3 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
-

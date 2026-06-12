@@ -9,6 +9,7 @@ import (
 	"stock/src/location/infrastructure/criteria"
 
 	"github.com/gin-gonic/gin"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 )
 
 // LocationController maneja las peticiones HTTP relacionadas con ubicaciones
@@ -66,14 +67,14 @@ func (c *LocationController) CreateLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 	req.TenantID = tenantID.(string)
 
 	// Parsear el cuerpo de la petición
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -84,9 +85,9 @@ func (c *LocationController) CreateLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -104,7 +105,7 @@ func (c *LocationController) ListLocations(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -123,7 +124,7 @@ func (c *LocationController) ListLocations(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -136,14 +137,14 @@ func (c *LocationController) GetLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
 	locationID := ctx.Param("id")
 	if locationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Location ID is required")
 		return
 	}
 
@@ -154,9 +155,9 @@ func (c *LocationController) GetLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -170,21 +171,21 @@ func (c *LocationController) UpdateLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
 	locationID := ctx.Param("id")
 	if locationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Location ID is required")
 		return
 	}
 
 	// Parsear el cuerpo de la petición
 	var req request.UpdateLocationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -195,9 +196,9 @@ func (c *LocationController) UpdateLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -211,14 +212,14 @@ func (c *LocationController) ActivateLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
 	locationID := ctx.Param("id")
 	if locationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Location ID is required")
 		return
 	}
 
@@ -229,9 +230,9 @@ func (c *LocationController) ActivateLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -245,14 +246,14 @@ func (c *LocationController) DeactivateLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
 	locationID := ctx.Param("id")
 	if locationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Location ID is required")
 		return
 	}
 
@@ -263,9 +264,9 @@ func (c *LocationController) DeactivateLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -279,14 +280,14 @@ func (c *LocationController) DeleteLocation(ctx *gin.Context) {
 	// Obtener el tenant ID del contexto
 	tenantID, exists := ctx.Get("tenantID")
 	if !exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Tenant ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
 		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
 	locationID := ctx.Param("id")
 	if locationID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Location ID is required"})
+		httpresp.JSON(ctx, http.StatusBadRequest, "Location ID is required")
 		return
 	}
 
@@ -297,9 +298,9 @@ func (c *LocationController) DeleteLocation(ctx *gin.Context) {
 	if err != nil {
 		switch err.(type) {
 		case *exception.LocationNotFound:
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusNotFound, err.Error())
 		default:
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -317,7 +318,7 @@ func (c *LocationController) ListStores(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -339,7 +340,7 @@ func (c *LocationController) ListStores(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -356,7 +357,7 @@ func (c *LocationController) ListDistributionCenters(ctx *gin.Context) {
 		if tenant, exists := ctx.Get("tenantID"); exists {
 			tenantID = tenant.(string)
 		} else {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 			return
 		}
 	}
@@ -378,7 +379,7 @@ func (c *LocationController) ListDistributionCenters(ctx *gin.Context) {
 
 	// Manejar errores
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
