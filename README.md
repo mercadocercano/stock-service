@@ -12,7 +12,7 @@ Este proyecto fue extraído del monorepo SaaS Marketplace como parte de la migra
 | **Endpoints clave** | `POST /api/v1/sale`, `POST /api/v1/stock-entries`, `GET /api/v1/availability` |
 | **Build** | `go build -o stock-service .` (desde `main.go`, no `cmd/api`) |
 
-Ver: `documentation/PROJECT_STATUS_MAR_2026.md`
+Ver: [`docs/`](docs/README.md) para arquitectura, ADRs y guías.
 
 ---
 
@@ -65,8 +65,10 @@ Copia `.env.example` a `.env` y configura las variables necesarias.
 
 ## Documentación
 
-- [Documentación de API](./api-docs/)
-- [Documentación técnica](./documentation/)
+Ver [`docs/`](docs/README.md) para arquitectura, ADRs, guías operativas y setup.
+
+- [Documentación de API (OpenAPI)](./api-docs/openapi.yml)
+- [Índice de documentación](docs/README.md)
 
 ## Migración desde Monorepo
 

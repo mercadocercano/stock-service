@@ -24,9 +24,9 @@ Se ha implementado exitosamente un **flujo de venta mínimo y mockeado que descu
    - Script bash automatizado para probar el flujo completo
 
 5. **Documentación**:
-   - `SALE_ENDPOINT_README.md` - Documentación completa del endpoint
-   - `QUICK_TEST_COMMANDS.md` - Comandos de prueba rápida
-   - `IMPLEMENTACION_COMPLETADA.md` - Este archivo
+   - [`endpoint-venta.md`](../guides/endpoint-venta.md) - Documentación completa del endpoint
+   - [`comandos-prueba-rapida.md`](../guides/comandos-prueba-rapida.md) - Comandos de prueba rápida
+   - `flujo-venta-minimo.md` - Este archivo
 
 ### Archivos Modificados
 
