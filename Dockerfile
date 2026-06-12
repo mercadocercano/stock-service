@@ -5,7 +5,7 @@
 # ==============================================
 # Stage 1: Dependencies and cache optimization
 # ==============================================
-FROM golang:1.24-alpine AS deps
+FROM golang:1.25-alpine AS deps
 WORKDIR /app
 
 # Install build dependencies
@@ -42,7 +42,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # ==============================================
 # Stage 3: Development stage (with Air hot reload)
 # ==============================================
-FROM golang:1.24-alpine AS development
+FROM golang:1.25-alpine AS development
 
 # Security: Create non-root user first
 RUN addgroup -g 1001 -S appgroup && \
@@ -60,7 +60,7 @@ RUN apk add --no-cache \
     && apk del tzdata
 
 # Install Air for hot reload (compatible with Go 1.22)
-RUN go install github.com/cosmtrek/air@v1.49.0
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
