@@ -1,6 +1,23 @@
 version: '3.8'
 
 services:
+  # ---------------------------------------------------------------------------
+  # Setup: crea la DB de stock en el postgres compartido (idempotente)
+  # ---------------------------------------------------------------------------
+  postgres-setup:
+    image: pgvector/pgvector:pg15
+    container_name: stock-service-postgres-setup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command: >
+      sh -c "
+        echo 'Creating stock database...' &&
+        psql -h lab-postgres -U ${POSTGRES_USER:-postgres} -c 'CREATE DATABASE stock_db;' || true &&
+        echo 'Database ready.'
+      "
+    networks:
+      - lab-network
+
   # Stock Service
   stock-service:
     build:
@@ -9,11 +26,11 @@ services:
       target: development
     container_name: mc-stock-service
     environment:
-      # PostgreSQL configuration (using shared postgres)
-      DB_HOST: postgres
+      # PostgreSQL configuration (using shared lab-postgres)
+      DB_HOST: lab-postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DB_NAME: stock_db
       DB_SSLMODE: disable
       # Development environment
@@ -24,9 +41,10 @@ services:
     volumes:
       - ./src:/app/src:ro
       - ./migrations:/app/migrations:ro
-    # Dependencies are handled externally via docker-compose.infra.yml
+    depends_on:
+      - postgres-setup
     networks:
-      - saas-network
+      - lab-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -39,5 +57,5 @@ services:
       - "service_name=stock-service"
 
 networks:
-  saas-network:
+  lab-network:
     external: true
