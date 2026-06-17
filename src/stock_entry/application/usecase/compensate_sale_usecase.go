@@ -15,12 +15,21 @@ import (
 // HITO D: Usado para rollback cuando falla persistencia de orden/sale
 type CompensateSaleUseCase struct {
 	stockEntryRepo port.StockEntryRepository
+	logger         port.StockEventLogger
 }
 
 // NewCompensateSaleUseCase crea una nueva instancia del caso de uso
-func NewCompensateSaleUseCase(stockEntryRepo port.StockEntryRepository) *CompensateSaleUseCase {
+func NewCompensateSaleUseCase(stockEntryRepo port.StockEntryRepository, logger port.StockEventLogger) *CompensateSaleUseCase {
 	return &CompensateSaleUseCase{
 		stockEntryRepo: stockEntryRepo,
+		logger:         logger,
+	}
+}
+
+// logEvent emite un evento canónico si hay logger inyectado (nil-safe).
+func (uc *CompensateSaleUseCase) logEvent(e port.StockEvent) {
+	if uc.logger != nil {
+		uc.logger.Log(e)
 	}
 }
 
@@ -49,8 +58,21 @@ func (uc *CompensateSaleUseCase) Execute(
 
 	// Ejecutar compensación (método del repositorio implementado en HITO D)
 	if err := uc.stockEntryRepo.CompensateSale(ctx, tenantUUID, stockEntryID, req.Reason); err != nil {
+		uc.logEvent(port.StockEvent{
+			Event:        "stock.compensate_failed",
+			TenantID:     tenantID,
+			StockEntryID: req.StockEntryID,
+			Reason:       err.Error(),
+		})
 		return nil, fmt.Errorf("failed to compensate sale: %w", err)
 	}
+
+	uc.logEvent(port.StockEvent{
+		Event:        "stock.compensated",
+		TenantID:     tenantID,
+		StockEntryID: req.StockEntryID,
+		Reason:       req.Reason,
+	})
 
 	return &response.CompensateSaleResponse{
 		Success:      true,

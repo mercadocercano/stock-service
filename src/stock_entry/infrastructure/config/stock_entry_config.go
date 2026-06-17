@@ -2,9 +2,10 @@ package config
 
 import (
 	"database/sql"
-	
+
 	"stock/src/stock_entry/application/usecase"
 	"stock/src/stock_entry/infrastructure/controller"
+	"stock/src/stock_entry/infrastructure/logging"
 	"stock/src/stock_entry/infrastructure/persistence"
 )
 
@@ -18,9 +19,12 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 	// Repositorios
 	stockEntryRepo := persistence.NewPostgresStockEntryRepository(db)
 	stockAvailabilityRepo := persistence.NewPostgresStockAvailabilityRepository(db)
-	
+
+	// Logger canónico (ADR-001)
+	stockLogger := logging.NewStockLogger("stock")
+
 	// Use cases
-	createStockEntryUseCase := usecase.NewCreateStockEntryUseCase(stockEntryRepo)
+	createStockEntryUseCase := usecase.NewCreateStockEntryUseCase(stockEntryRepo, stockLogger)
 	bulkCreateStockEntryUseCase := usecase.NewBulkCreateStockEntryUseCase(stockEntryRepo)
 	getAvailabilityUseCase := usecase.NewGetAvailabilityUseCase(stockAvailabilityRepo)
 	listAvailabilityUseCase := usecase.NewListAvailabilityUseCase(stockAvailabilityRepo)
@@ -28,9 +32,9 @@ func NewStockEntryConfig(db *sql.DB) *StockEntryConfig {
 	releaseStockUseCase := usecase.NewReleaseStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	consumeStockUseCase := usecase.NewConsumeStockUseCase(stockAvailabilityRepo, stockEntryRepo)
 	revertConsumeUseCase := usecase.NewRevertConsumeUseCase(stockAvailabilityRepo, stockEntryRepo)
-	processSaleUseCase := usecase.NewProcessSaleUseCase(stockEntryRepo, stockAvailabilityRepo)
+	processSaleUseCase := usecase.NewProcessSaleUseCase(stockEntryRepo, stockAvailabilityRepo, stockLogger)
 	listSalesUseCase := usecase.NewListSalesUseCase(stockEntryRepo)
-	compensateSaleUseCase := usecase.NewCompensateSaleUseCase(stockEntryRepo)
+	compensateSaleUseCase := usecase.NewCompensateSaleUseCase(stockEntryRepo, stockLogger)
 
 	// Controller
 	stockEntryController := controller.NewStockEntryController(

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	
+
 	"github.com/google/uuid"
-	
+
 	"stock/src/stock_entry/application/request"
 	"stock/src/stock_entry/application/response"
 	"stock/src/stock_entry/domain/exception"
@@ -19,16 +19,26 @@ import (
 type ProcessSaleUseCase struct {
 	stockEntryRepo   port.StockEntryRepository
 	availabilityRepo port.StockAvailabilityRepository
+	logger           port.StockEventLogger
 }
 
 // NewProcessSaleUseCase crea una nueva instancia del caso de uso
 func NewProcessSaleUseCase(
 	stockEntryRepo port.StockEntryRepository,
 	availabilityRepo port.StockAvailabilityRepository,
+	logger port.StockEventLogger,
 ) *ProcessSaleUseCase {
 	return &ProcessSaleUseCase{
 		stockEntryRepo:   stockEntryRepo,
 		availabilityRepo: availabilityRepo,
+		logger:           logger,
+	}
+}
+
+// logEvent emite un evento canónico si hay logger inyectado (nil-safe).
+func (uc *ProcessSaleUseCase) logEvent(e port.StockEvent) {
+	if uc.logger != nil {
+		uc.logger.Log(e)
 	}
 }
 
@@ -67,23 +77,25 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 		
 		// Stock no inicializado → producto sin movimientos previos
 		if errors.Is(err, exception.ErrStockNotInitialized) {
+			uc.logEvent(port.StockEvent{Event: "stock.sale_rejected", TenantID: tenantID, SKU: req.VariantSKU, Reason: "stock_not_initialized"})
 			return &response.ProcessSaleResponse{
 				Success:    false,
 				Message:    fmt.Sprintf("Stock not initialized for SKU: %s. Product needs initial stock entry.", req.VariantSKU),
 				VariantSKU: req.VariantSKU,
 			}, nil
 		}
-		
+
 		// Stock insuficiente → validación de negocio
 		if errors.Is(err, exception.ErrInsufficientStock) {
 			metrics.StockInsufficient.Inc()
+			uc.logEvent(port.StockEvent{Event: "stock.sale_rejected", TenantID: tenantID, SKU: req.VariantSKU, Quantity: req.Quantity, Reason: err.Error()})
 			return &response.ProcessSaleResponse{
 				Success:    false,
 				Message:    err.Error(),
 				VariantSKU: req.VariantSKU,
 			}, nil
 		}
-		
+
 		// Error técnico (DB connection, transacción fallida, etc.)
 		return nil, fmt.Errorf("failed to process sale atomically: %w", err)
 	}
@@ -95,6 +107,14 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 		metrics.MCStockMovementsTotal.WithLabelValues(tenantID, "sale").Inc()
 		// Si la venta se procesó correctamente pero no podemos leer availability,
 		// aún retornamos success pero sin remaining stock
+		uc.logEvent(port.StockEvent{
+			Event:        "stock.sale_processed",
+			TenantID:     tenantID,
+			SKU:          req.VariantSKU,
+			StockEntryID: stockEntry.ID.String(),
+			Quantity:     req.Quantity,
+			Reference:    reference,
+		})
 		return &response.ProcessSaleResponse{
 			Success:      true,
 			Message:      "Sale processed successfully (availability read failed)",
@@ -108,6 +128,15 @@ func (uc *ProcessSaleUseCase) Execute(ctx context.Context, tenantID string, req 
 	// S001: actualizar nivel de stock y contar movimiento
 	metrics.MCStockLevel.WithLabelValues(tenantID, req.VariantSKU).Set(availability.AvailableQuantity)
 	metrics.MCStockMovementsTotal.WithLabelValues(tenantID, "sale").Inc()
+
+	uc.logEvent(port.StockEvent{
+		Event:        "stock.sale_processed",
+		TenantID:     tenantID,
+		SKU:          req.VariantSKU,
+		StockEntryID: stockEntry.ID.String(),
+		Quantity:     req.Quantity,
+		Reference:    reference,
+	})
 
 	return &response.ProcessSaleResponse{
 		Success:        true,

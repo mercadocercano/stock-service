@@ -22,7 +22,7 @@ func TestCreateStockEntryUseCase_Execute_Success(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	tenantID := uuid.New()
 	req := request.CreateStockEntryRequest{
@@ -51,7 +51,7 @@ func TestCreateStockEntryUseCase_Execute_ValidationError_MissingSKU(t *testing.T
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	req := request.CreateStockEntryRequest{
 		TenantID:  uuid.New().String(),
@@ -73,7 +73,7 @@ func TestCreateStockEntryUseCase_Execute_ValidationError_ZeroQuantity(t *testing
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	req := request.CreateStockEntryRequest{
 		TenantID:   uuid.New().String(),
@@ -96,7 +96,7 @@ func TestCreateStockEntryUseCase_Execute_InvalidTenantID(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	req := request.CreateStockEntryRequest{
 		TenantID:   "invalid-uuid",
@@ -120,7 +120,7 @@ func TestCreateStockEntryUseCase_Execute_RepositoryError(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	req := request.CreateStockEntryRequest{
 		TenantID:   uuid.New().String(),
@@ -146,7 +146,7 @@ func TestCreateStockEntryUseCase_Execute_WithOptionalFields(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo)
+	uc := usecase.NewCreateStockEntryUseCase(mockStockEntryRepo, nil)
 
 	tenantID := uuid.New()
 	locationID := uuid.New()

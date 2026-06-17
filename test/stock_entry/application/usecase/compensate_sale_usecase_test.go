@@ -19,7 +19,7 @@ func TestCompensateSaleUseCase_Execute_Success(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	tenantID := uuid.New()
 	stockEntryID := uuid.New()
@@ -48,7 +48,7 @@ func TestCompensateSaleUseCase_Execute_InvalidRequest_MissingEntryID(t *testing.
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	req := &request.CompensateSaleRequest{
 		StockEntryID: "",
@@ -69,7 +69,7 @@ func TestCompensateSaleUseCase_Execute_InvalidRequest_MissingReason(t *testing.T
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	req := &request.CompensateSaleRequest{
 		StockEntryID: uuid.New().String(),
@@ -90,7 +90,7 @@ func TestCompensateSaleUseCase_Execute_InvalidTenantID(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	req := &request.CompensateSaleRequest{
 		StockEntryID: uuid.New().String(),
@@ -110,7 +110,7 @@ func TestCompensateSaleUseCase_Execute_InvalidStockEntryID(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	req := &request.CompensateSaleRequest{
 		StockEntryID: "bad-uuid",
@@ -130,7 +130,7 @@ func TestCompensateSaleUseCase_Execute_RepositoryError(t *testing.T) {
 	ctx := context.Background()
 	mockStockEntryRepo := new(mockRepo.MockStockEntryRepository)
 
-	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo)
+	uc := usecase.NewCompensateSaleUseCase(mockStockEntryRepo, nil)
 
 	tenantID := uuid.New()
 	stockEntryID := uuid.New()

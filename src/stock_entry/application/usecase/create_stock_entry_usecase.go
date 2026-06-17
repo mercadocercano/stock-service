@@ -15,12 +15,21 @@ import (
 // CreateStockEntryUseCase caso de uso para crear una entrada de stock
 type CreateStockEntryUseCase struct {
 	stockEntryRepo port.StockEntryRepository
+	logger         port.StockEventLogger
 }
 
 // NewCreateStockEntryUseCase crea una nueva instancia del caso de uso
-func NewCreateStockEntryUseCase(stockEntryRepo port.StockEntryRepository) *CreateStockEntryUseCase {
+func NewCreateStockEntryUseCase(stockEntryRepo port.StockEntryRepository, logger port.StockEventLogger) *CreateStockEntryUseCase {
 	return &CreateStockEntryUseCase{
 		stockEntryRepo: stockEntryRepo,
+		logger:         logger,
+	}
+}
+
+// logEvent emite un evento canónico si hay logger inyectado (nil-safe).
+func (uc *CreateStockEntryUseCase) logEvent(e port.StockEvent) {
+	if uc.logger != nil {
+		uc.logger.Log(e)
 	}
 }
 
@@ -85,7 +94,17 @@ func (uc *CreateStockEntryUseCase) Execute(ctx context.Context, req request.Crea
 	if err := uc.stockEntryRepo.Save(ctx, stockEntry); err != nil {
 		return nil, fmt.Errorf("error saving stock entry: %w", err)
 	}
-	
+
+	uc.logEvent(port.StockEvent{
+		Event:        "stock.entry_created",
+		TenantID:     req.TenantID,
+		SKU:          req.ProductSKU,
+		StockEntryID: stockEntry.ID.String(),
+		Quantity:     req.Quantity,
+		EntryType:    req.EntryType,
+		Reference:    req.ReferenceNumber,
+	})
+
 	// Convertir a response
 	resp := response.FromStockEntry(stockEntry)
 	return &resp, nil

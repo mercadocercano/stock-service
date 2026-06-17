@@ -24,7 +24,7 @@ func TestProcessSaleUseCase_Execute_Success(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	entryMother := mother.StockEntryMother{}
@@ -63,7 +63,7 @@ func TestProcessSaleUseCase_Execute_StockNotInitialized(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	req := &request.ProcessSaleRequest{
@@ -89,7 +89,7 @@ func TestProcessSaleUseCase_Execute_InsufficientStock(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	req := &request.ProcessSaleRequest{
@@ -115,7 +115,7 @@ func TestProcessSaleUseCase_Execute_TechnicalError(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	req := &request.ProcessSaleRequest{
@@ -140,7 +140,7 @@ func TestProcessSaleUseCase_Execute_ValidationError_MissingSKU(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	req := &request.ProcessSaleRequest{
 		VariantSKU: "",
@@ -161,7 +161,7 @@ func TestProcessSaleUseCase_Execute_ValidationError_ZeroQuantity(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	req := &request.ProcessSaleRequest{
 		VariantSKU: "SKU-001",
@@ -182,7 +182,7 @@ func TestProcessSaleUseCase_Execute_InvalidTenantID(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	req := &request.ProcessSaleRequest{
 		VariantSKU: "SKU-001",
@@ -203,7 +203,7 @@ func TestProcessSaleUseCase_Execute_GeneratesReferenceWhenEmpty(t *testing.T) {
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	entryMother := mother.StockEntryMother{}
@@ -242,7 +242,7 @@ func TestProcessSaleUseCase_Execute_AvailabilityReadFail_StillSuccess(t *testing
 	mockEntryRepo := new(mockRepo.MockStockEntryRepository)
 	mockAvailRepo := new(mockRepo.MockStockAvailabilityRepository)
 
-	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo)
+	uc := usecase.NewProcessSaleUseCase(mockEntryRepo, mockAvailRepo, nil)
 
 	tenantID := uuid.New()
 	entryMother := mother.StockEntryMother{}
