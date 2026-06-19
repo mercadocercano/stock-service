@@ -200,10 +200,10 @@ func (ctrl *StockEntryController) ReleaseStock(c *gin.Context) {
 
 // RegisterRoutes registra las rutas del controller
 func (ctrl *StockEntryController) RegisterRoutes(router *gin.RouterGroup) {
-	stockEntries := router.Group("/stock-entries")
+	stockEntries := router.Group("")
 	{
-		stockEntries.POST("", ctrl.CreateStockEntry)
-		stockEntries.POST("/bulk", ctrl.BulkCreateStockEntries)
+		stockEntries.POST("/stock-entries", ctrl.CreateStockEntry)
+		stockEntries.POST("/stock-entries/bulk", ctrl.BulkCreateStockEntries)
 	}
 
 	// Endpoint de disponibilidad

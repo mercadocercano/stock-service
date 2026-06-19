@@ -1,3 +1,15 @@
+---
+adr: ADR-002
+status: accepted
+skills:
+  implement:
+    - dev/hexagonal-go
+  verify:
+    - dev/go-hex-audit
+    - dev/code-reviewer
+  pending:   # skills aún inexistentes — ver épica EPIC roadmap
+    - dev/ddd-tactical
+---
 # ADR-002: Coordinación de stock multi-canal con dominio puro y stock físico único
 
 **Estado**: Aceptado

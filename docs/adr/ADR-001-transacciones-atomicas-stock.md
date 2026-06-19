@@ -1,3 +1,14 @@
+---
+adr: ADR-001
+status: accepted
+skills:
+  implement:
+    - dev/hexagonal-go
+  verify:
+    - dev/go-hex-audit
+    - dev/code-reviewer
+    - dev/concurrency-transactions
+---
 # ADR-001: Transacciones atómicas de stock con lock row-level
 
 **Estado**: Aceptado
