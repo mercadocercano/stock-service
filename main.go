@@ -18,6 +18,7 @@ import (
 	"github.com/hornosg/go-shared/infrastructure/env"
 	tenantmw "github.com/hornosg/go-shared/infrastructure/middleware"
 	goshpostgres "github.com/hornosg/go-shared/infrastructure/postgres"
+	sharedmigrate "github.com/hornosg/go-shared/migrate"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -77,6 +78,11 @@ func main() {
 	defer db.Close()
 	goshpostgres.StartPoolMonitor(context.Background(), db, goshpostgres.MonitorOptions{Service: "stock-service", DBName: dbName})
 	log.Println("Conexión a la base de datos establecida con éxito")
+
+	// Migraciones versionadas in-app (ADR-001) — fail-fast antes de servir tráfico.
+	if err := sharedmigrate.RunMigrations(db, MigrationsFS, dbName); err != nil {
+		log.Fatalf("Error running migrations: %v", err)
+	}
 
 	// API v1 grupo de rutas
 	v1 := router.Group("/api/v1")
