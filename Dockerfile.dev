@@ -1,10 +1,12 @@
 # Dockerfile.dev para Go con hot reload
-FROM golang:1.25-alpine
+FROM golang:1.25-bookworm
 
 WORKDIR /app
 
-RUN apk add --no-cache git ca-certificates tzdata curl postgresql-client && \
-    go install github.com/air-verse/air@v1.61.7
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates tzdata curl postgresql-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && go install github.com/air-verse/air@v1.61.7
 
 # Copiar archivos de proyecto
 COPY go.mod go.sum ./

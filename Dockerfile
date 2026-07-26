@@ -5,11 +5,13 @@
 # ==============================================
 # Stage 1: Dependencies and cache optimization
 # ==============================================
-FROM golang:1.25-alpine AS deps
+FROM golang:1.25-bookworm AS deps
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 # Configure private Go modules
 ARG GITHUB_TOKEN
@@ -42,25 +44,25 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # ==============================================
 # Stage 3: Development stage (with Air hot reload)
 # ==============================================
-FROM golang:1.25-alpine AS development
+FROM golang:1.25-bookworm AS development
 
 # Security: Create non-root user first
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S -D -h /app -s /bin/sh -G appgroup -u 1001 appuser
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid appgroup --create-home --home-dir /app --shell /bin/sh appuser
 
 # Install runtime dependencies including Air
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
     curl \
     postgresql-client \
     git \
-    && cp /usr/share/zoneinfo/UTC /etc/localtime \
-    && echo "UTC" > /etc/timezone \
-    && apk del tzdata
+    && rm -rf /var/lib/apt/lists/* \
+    && (cp /usr/share/zoneinfo/UTC /etc/localtime || true) \
+    && echo "UTC" > /etc/timezone
 
-# Install Air for hot reload (compatible with Go 1.22)
-RUN go install github.com/air-verse/air@latest
+# Install Air for hot reload
+RUN go install github.com/air-verse/air@v1.61.7
 
 WORKDIR /app
 
@@ -100,9 +102,10 @@ CMD sh -c 'if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://${GI
 # ==============================================
 # Stage 4: Migrate stage (Alpine + psql para Job K8s)
 # ==============================================
-FROM alpine:3.18 AS migrate
+FROM debian:bookworm-slim AS migrate
 
-RUN apk add --no-cache postgresql-client
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /app/migrations ./migrations

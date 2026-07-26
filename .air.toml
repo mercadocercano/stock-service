@@ -4,7 +4,9 @@ tmp_dir = "tmp"
 
 [build]
 # Comando para construir
-cmd = "go build -o ./tmp/main ."
+# -buildvcs=false: el .git bind-mounteado pertenece al uid del host, no al del
+# contenedor (root) — git lo marca "dubious ownership" y el build falla sin este flag.
+cmd = "go build -buildvcs=false -o ./tmp/main ."
 # Binario a ejecutar
 bin = "./tmp/main"
 # Archivos que se deben vigilar para cambios
