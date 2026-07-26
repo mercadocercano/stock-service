@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log"
+	"net/http"
+	_ "net/http/pprof" // registra /debug/pprof/* en http.DefaultServeMux (ver startDebugServer)
 	"os"
+	"runtime"
 
 	apiConfig "stock/src/api/config"
 	locationConfig "stock/src/location/infrastructure/config"
@@ -22,7 +26,40 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// startDebugServer expone /debug/pprof/* (import _ "net/http/pprof") y /debug/memstats
+// en un puerto separado, sin pasar por el router público de Gin ni por Kong (PLAT-E38 T-STK-M1:
+// medir HeapAlloc/HeapSys/HeapIdle/NumGC en reposo y bajo carga antes de tocar GOMEMLIMIT).
+// Deshabilitado por defecto: solo arranca si DEBUG_PPROF=true.
+func startDebugServer() {
+	if os.Getenv("DEBUG_PPROF") != "true" {
+		return
+	}
+	http.DefaultServeMux.HandleFunc("/debug/memstats", func(w http.ResponseWriter, r *http.Request) {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"heap_alloc_bytes":    m.HeapAlloc,
+			"heap_sys_bytes":      m.HeapSys,
+			"heap_idle_bytes":     m.HeapIdle,
+			"heap_released_bytes": m.HeapReleased,
+			"heap_inuse_bytes":    m.HeapInuse,
+			"sys_bytes":           m.Sys,
+			"num_gc":              m.NumGC,
+			"gomaxprocs":          runtime.GOMAXPROCS(0),
+		})
+	})
+	go func() {
+		log.Println("Debug server (pprof + memstats) escuchando en :6060")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			log.Printf("Debug server detenido: %v", err)
+		}
+	}()
+}
+
 func main() {
+	startDebugServer()
+
 	// Configurar el router con Gin
 	router := gin.New()
 

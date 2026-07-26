@@ -36,6 +36,12 @@ services:
       # Development environment
       GIN_MODE: debug
       LOG_LEVEL: debug
+      # PLAT-E38 T-STK-M1: pprof + /debug/memstats en :6060 (no publicado en `ports`, no pasa
+      # por Kong). Default false — togglear con `DEBUG_PPROF=true docker compose up -d`.
+      DEBUG_PPROF: ${DEBUG_PPROF:-false}
+      # PLAT-E38 T-STK-M3: techo soft de memoria del runtime de Go (ver docker-compose.yml raíz
+      # para el razonamiento completo).
+      GOMEMLIMIT: ${STOCK_GOMEMLIMIT:-64MiB}
     ports:
       - "8100:8080"
     volumes:
