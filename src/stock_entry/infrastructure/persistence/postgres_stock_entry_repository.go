@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/hornosg/go-shared/infrastructure/postgres"
 
 	"stock/src/stock_entry/domain/entity"
 	"stock/src/stock_entry/domain/exception"
@@ -18,7 +19,14 @@ type dbExecer interface {
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
-// PostgresStockEntryRepository implementación PostgreSQL del repositorio
+// PostgresStockEntryRepository implementación PostgreSQL del repositorio.
+//
+// RLS (PLAT-E30, RULE-09/RULE-10): `stock_entries` tiene ROW LEVEL SECURITY forzado con la
+// policy `tenant_isolation` (migración 009). Cada operación corre dentro de
+// postgres.WithRLSInTransaction, que fija `app.tenant_id` con SET LOCAL — sin él, cualquier
+// query erra (fail-closed) bajo el rol NOBYPASSRLS `stock_app`. El filtro manual
+// `WHERE tenant_id = $` se mantiene como defensa en profundidad. recalcAvailability escribe
+// en `stock_availability` (también RLS-forced) dentro de la MISMA transacción RLS.
 type PostgresStockEntryRepository struct {
 	db *sql.DB
 }
@@ -28,7 +36,9 @@ func NewPostgresStockEntryRepository(db *sql.DB) port.StockEntryRepository {
 	return &PostgresStockEntryRepository{db: db}
 }
 
-// Save guarda una entrada de stock (HITO 2.1 - con variant_sku)
+// Save guarda una entrada de stock (HITO 2.1 - con variant_sku).
+// RLS: el INSERT en stock_entries y el recalc en stock_availability corren en la misma
+// transacción RLS (mismo app.tenant_id). Tenant: entry.TenantID (path del WITH CHECK).
 func (r *PostgresStockEntryRepository) Save(ctx context.Context, entry *entity.StockEntry) error {
 	query := `
 		INSERT INTO stock_entries (
@@ -37,70 +47,14 @@ func (r *PostgresStockEntryRepository) Save(ctx context.Context, entry *entity.S
 			reference_number, notes, status, is_active, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`
-	
-	_, err := r.db.ExecContext(ctx, query,
-		entry.ID,
-		entry.TenantID,
-		entry.VariantSKU,
-		entry.VariantSKU,  // Copiar a product_sku por compatibilidad
-		entry.ProductID,
-		entry.ProductName,
-		entry.LocationID,
-		entry.EntryType,
-		entry.Quantity,
-		entry.UnitOfMeasure,
-		entry.UnitCost,
-		entry.TotalCost,
-		entry.ReferenceNumber,
-		entry.Notes,
-		entry.Status,
-		entry.IsActive,
-		entry.CreatedAt,
-		entry.UpdatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("error saving stock entry: %w", err)
-	}
 
-	if err := r.recalcAvailability(ctx, r.db, entry.TenantID, entry.VariantSKU, entry); err != nil {
-		return fmt.Errorf("error updating availability after save: %w", err)
-	}
-
-	return nil
-}
-
-// SaveBulk guarda múltiples entradas (HITO 2.1 - con variant_sku)
-func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*entity.StockEntry) error {
-	if len(entries) == 0 {
-		return nil
-	}
-	
-	// Usar transacción para bulk insert
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO stock_entries (
-			id, tenant_id, variant_sku, product_sku, product_id, product_name, location_id,
-			entry_type, quantity, unit_of_measure, unit_cost, total_cost,
-			reference_number, notes, status, is_active, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	
-	skuSeen := make(map[string]*entity.StockEntry)
-	for _, entry := range entries {
-		_, err = stmt.ExecContext(ctx,
+	rc := postgres.RLSContext{TenantID: entry.TenantID.String()}
+	return postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, query,
 			entry.ID,
 			entry.TenantID,
 			entry.VariantSKU,
-			entry.VariantSKU,  // Copiar a product_sku
+			entry.VariantSKU,  // Copiar a product_sku por compatibilidad
 			entry.ProductID,
 			entry.ProductName,
 			entry.LocationID,
@@ -117,22 +71,78 @@ func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*
 			entry.UpdatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("error saving entry for variant SKU %s: %w", entry.VariantSKU, err)
+			return fmt.Errorf("error saving stock entry: %w", err)
 		}
-		skuSeen[entry.VariantSKU] = entry
-	}
-	stmt.Close()
 
-	for sku, entry := range skuSeen {
-		if err := r.recalcAvailability(ctx, tx, entry.TenantID, sku, entry); err != nil {
-			return fmt.Errorf("error updating availability for SKU %s: %w", sku, err)
+		if err := r.recalcAvailability(ctx, tx, entry.TenantID, entry.VariantSKU, entry); err != nil {
+			return fmt.Errorf("error updating availability after save: %w", err)
 		}
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
-// FindByID busca una entrada por ID
+// SaveBulk guarda múltiples entradas (HITO 2.1 - con variant_sku).
+// RLS: bulk es single-tenant (el controller fija req.TenantID desde el claim y lo propaga a
+// todas las entries), así que un único app.tenant_id alcanza para toda la transacción.
+// Tenant: entries[0].TenantID (path del WITH CHECK).
+func (r *PostgresStockEntryRepository) SaveBulk(ctx context.Context, entries []*entity.StockEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	rc := postgres.RLSContext{TenantID: entries[0].TenantID.String()}
+	return postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO stock_entries (
+				id, tenant_id, variant_sku, product_sku, product_id, product_name, location_id,
+				entry_type, quantity, unit_of_measure, unit_cost, total_cost,
+				reference_number, notes, status, is_active, created_at, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		`)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		skuSeen := make(map[string]*entity.StockEntry)
+		for _, entry := range entries {
+			_, err = stmt.ExecContext(ctx,
+				entry.ID,
+				entry.TenantID,
+				entry.VariantSKU,
+				entry.VariantSKU, // Copiar a product_sku
+				entry.ProductID,
+				entry.ProductName,
+				entry.LocationID,
+				entry.EntryType,
+				entry.Quantity,
+				entry.UnitOfMeasure,
+				entry.UnitCost,
+				entry.TotalCost,
+				entry.ReferenceNumber,
+				entry.Notes,
+				entry.Status,
+				entry.IsActive,
+				entry.CreatedAt,
+				entry.UpdatedAt,
+			)
+			if err != nil {
+				return fmt.Errorf("error saving entry for variant SKU %s: %w", entry.VariantSKU, err)
+			}
+			skuSeen[entry.VariantSKU] = entry
+		}
+		stmt.Close()
+
+		for sku, entry := range skuSeen {
+			if err := r.recalcAvailability(ctx, tx, entry.TenantID, sku, entry); err != nil {
+				return fmt.Errorf("error updating availability for SKU %s: %w", sku, err)
+			}
+		}
+		return nil
+	})
+}
+
+// FindByID busca una entrada por ID. Tenant: tenantID param.
 func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) (*entity.StockEntry, error) {
 	query := `
 		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -141,62 +151,12 @@ func (r *PostgresStockEntryRepository) FindByID(ctx context.Context, id uuid.UUI
 		FROM stock_entries
 		WHERE id = $1 AND tenant_id = $2
 	`
-	
-	entry := &entity.StockEntry{}
-	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
-		&entry.ID,
-		&entry.TenantID,
-		&entry.VariantSKU,
-		&entry.ProductID,
-		&entry.ProductName,
-		&entry.LocationID,
-		&entry.EntryType,
-		&entry.Quantity,
-		&entry.UnitOfMeasure,
-		&entry.UnitCost,
-		&entry.TotalCost,
-		&entry.ReferenceNumber,
-		&entry.Notes,
-		&entry.Status,
-		&entry.IsActive,
-		&entry.CreatedAt,
-		&entry.UpdatedAt,
-	)
-	
-	// Mantener product_sku sincronizado
-	entry.ProductSKU = entry.VariantSKU
-	
-	if err == sql.ErrNoRows {
-		return nil, exception.ErrStockEntryNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	
-	return entry, nil
-}
 
-// FindByTenantAndSKU busca entradas por tenant y variant SKU
-func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) ([]*entity.StockEntry, error) {
-	query := `
-		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
-			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
-			   reference_number, notes, status, is_active, created_at, updated_at
-		FROM stock_entries
-		WHERE tenant_id = $1 AND (variant_sku = $2 OR product_sku = $2) AND is_active = true
-		ORDER BY created_at DESC
-	`
-	
-	rows, err := r.db.QueryContext(ctx, query, tenantID, variantSKU)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	entries := make([]*entity.StockEntry, 0)
-	for rows.Next() {
-		entry := &entity.StockEntry{}
-		err := rows.Scan(
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	entry := &entity.StockEntry{}
+	var found bool
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		scanErr := tx.QueryRowContext(ctx, query, id, tenantID).Scan(
 			&entry.ID,
 			&entry.TenantID,
 			&entry.VariantSKU,
@@ -215,17 +175,85 @@ func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, t
 			&entry.CreatedAt,
 			&entry.UpdatedAt,
 		)
-		if err != nil {
-			return nil, err
+		if scanErr == sql.ErrNoRows {
+			return nil
 		}
-		entry.ProductSKU = entry.VariantSKU  // Mantener sincronizado
-		entries = append(entries, entry)
+		if scanErr != nil {
+			return scanErr
+		}
+		// Mantener product_sku sincronizado
+		entry.ProductSKU = entry.VariantSKU
+		found = true
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	
+	if !found {
+		return nil, exception.ErrStockEntryNotFound
+	}
+
+	return entry, nil
+}
+
+// FindByTenantAndSKU busca entradas por tenant y variant SKU. Tenant: tenantID param.
+func (r *PostgresStockEntryRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) ([]*entity.StockEntry, error) {
+	query := `
+		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
+			   entry_type, quantity, unit_of_measure, unit_cost, total_cost,
+			   reference_number, notes, status, is_active, created_at, updated_at
+		FROM stock_entries
+		WHERE tenant_id = $1 AND (variant_sku = $2 OR product_sku = $2) AND is_active = true
+		ORDER BY created_at DESC
+	`
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	entries := make([]*entity.StockEntry, 0)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		rows, queryErr := tx.QueryContext(ctx, query, tenantID, variantSKU)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			entry := &entity.StockEntry{}
+			if scanErr := rows.Scan(
+				&entry.ID,
+				&entry.TenantID,
+				&entry.VariantSKU,
+				&entry.ProductID,
+				&entry.ProductName,
+				&entry.LocationID,
+				&entry.EntryType,
+				&entry.Quantity,
+				&entry.UnitOfMeasure,
+				&entry.UnitCost,
+				&entry.TotalCost,
+				&entry.ReferenceNumber,
+				&entry.Notes,
+				&entry.Status,
+				&entry.IsActive,
+				&entry.CreatedAt,
+				&entry.UpdatedAt,
+			); scanErr != nil {
+				return scanErr
+			}
+			entry.ProductSKU = entry.VariantSKU // Mantener sincronizado
+			entries = append(entries, entry)
+		}
+		return rows.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return entries, nil
 }
 
-// FindByTenant busca entradas por tenant con paginación
+// FindByTenant busca entradas por tenant con paginación. Tenant: tenantID param.
 func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*entity.StockEntry, error) {
 	query := `
 		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -236,68 +264,89 @@ func (r *PostgresStockEntryRepository) FindByTenant(ctx context.Context, tenantI
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
-	rows, err := r.db.QueryContext(ctx, query, tenantID, limit, offset)
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	entries := make([]*entity.StockEntry, 0)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		rows, queryErr := tx.QueryContext(ctx, query, tenantID, limit, offset)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			entry := &entity.StockEntry{}
+			if scanErr := rows.Scan(
+				&entry.ID,
+				&entry.TenantID,
+				&entry.VariantSKU,
+				&entry.ProductID,
+				&entry.ProductName,
+				&entry.LocationID,
+				&entry.EntryType,
+				&entry.Quantity,
+				&entry.UnitOfMeasure,
+				&entry.UnitCost,
+				&entry.TotalCost,
+				&entry.ReferenceNumber,
+				&entry.Notes,
+				&entry.Status,
+				&entry.IsActive,
+				&entry.CreatedAt,
+				&entry.UpdatedAt,
+			); scanErr != nil {
+				return scanErr
+			}
+			entry.ProductSKU = entry.VariantSKU // Mantener sincronizado
+			entries = append(entries, entry)
+		}
+		return rows.Err()
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	
-	entries := make([]*entity.StockEntry, 0)
-	for rows.Next() {
-		entry := &entity.StockEntry{}
-		err := rows.Scan(
-			&entry.ID,
-			&entry.TenantID,
-			&entry.VariantSKU,
-			&entry.ProductID,
-			&entry.ProductName,
-			&entry.LocationID,
-			&entry.EntryType,
-			&entry.Quantity,
-			&entry.UnitOfMeasure,
-			&entry.UnitCost,
-			&entry.TotalCost,
-			&entry.ReferenceNumber,
-			&entry.Notes,
-			&entry.Status,
-			&entry.IsActive,
-			&entry.CreatedAt,
-			&entry.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		entry.ProductSKU = entry.VariantSKU  // Mantener sincronizado
-		entries = append(entries, entry)
-	}
-	
+
 	return entries, nil
 }
 
-// Delete soft delete de una entrada
+// Delete soft delete de una entrada. Tenant: tenantID param.
 func (r *PostgresStockEntryRepository) Delete(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) error {
 	query := `
 		UPDATE stock_entries
 		SET is_active = false, updated_at = NOW()
 		WHERE id = $1 AND tenant_id = $2
 	`
-	
-	result, err := r.db.ExecContext(ctx, query, id, tenantID)
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	var rows int64
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		result, execErr := tx.ExecContext(ctx, query, id, tenantID)
+		if execErr != nil {
+			return execErr
+		}
+		ra, _ := result.RowsAffected()
+		rows = ra
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}
-	
-	rows, _ := result.RowsAffected()
+
 	if rows == 0 {
 		return exception.ErrStockEntryNotFound
 	}
-	
+
 	return nil
 }
 
-// ProcessSaleAtomic valida y descuenta stock en una sola transacción atómica
-// HITO D: Operación atómica con SELECT FOR UPDATE para eliminar race conditions
+// ProcessSaleAtomic valida y descuenta stock en una sola transacción atómica.
+// HITO D: Operación atómica con SELECT FOR UPDATE para eliminar race conditions.
+// RLS: el lock, el insert en stock_entries y el recalc en stock_availability corren en la
+// misma transacción RLS (mismo app.tenant_id). El SELECT FOR UPDATE queda acotado por la
+// policy al tenant del caller — consistente con el WHERE tenant_id manual. Tenant: tenantID
+// param (path del WITH CHECK).
 func (r *PostgresStockEntryRepository) ProcessSaleAtomic(
 	ctx context.Context,
 	tenantID uuid.UUID,
@@ -305,89 +354,96 @@ func (r *PostgresStockEntryRepository) ProcessSaleAtomic(
 	quantity float64,
 	reference string,
 ) (*entity.StockEntry, error) {
-	// Iniciar transacción
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
 
 	// 1. SELECT FOR UPDATE - Lock row y obtener disponibilidad actual
 	// Falla con sql.ErrNoRows si el producto nunca tuvo movimientos (correcto)
-	var availableQty float64
 	lockQuery := `
-		SELECT available_quantity 
-		FROM stock_availability 
-		WHERE tenant_id = $1 
-		  AND variant_sku = $2 
+		SELECT available_quantity
+		FROM stock_availability
+		WHERE tenant_id = $1
+		  AND variant_sku = $2
 		  AND location_id IS NULL
 		FOR UPDATE
 	`
-	
-	err = tx.QueryRowContext(ctx, lockQuery, tenantID, variantSKU).Scan(&availableQty)
-	if err == sql.ErrNoRows {
-		// Producto sin stock inicializado → no vendible
-		return nil, exception.ErrStockNotInitialized
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to lock stock availability: %w", err)
-	}
-
-	// 2. Validación en Go (no en DB, no en trigger)
-	if availableQty < quantity {
-		return nil, fmt.Errorf("%w: available=%.2f, requested=%.2f", 
-			exception.ErrInsufficientStock, availableQty, quantity)
-	}
-
-	// 3. Crear entidad de dominio
-	stockEntry, err := entity.NewStockEntry(
-		tenantID,
-		variantSKU,
-		entity.EntryTypeSale,
-		quantity,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stock entry entity: %w", err)
-	}
-	
-	stockEntry.SetReference(reference)
-	if err := stockEntry.Confirm(); err != nil {
-		return nil, fmt.Errorf("failed to confirm stock entry: %w", err)
-	}
 
 	// 4. Persistir movimiento de venta
 	insertQuery := `
 		INSERT INTO stock_entries (
-			id, tenant_id, variant_sku, product_sku, 
-			entry_type, quantity, reference_number, 
+			id, tenant_id, variant_sku, product_sku,
+			entry_type, quantity, reference_number,
 			status, is_active, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW(), NOW())
 	`
-	
-	_, err = tx.ExecContext(ctx, insertQuery,
-		stockEntry.ID,
-		tenantID,
-		variantSKU,
-		variantSKU, // Copiar a product_sku por compatibilidad
-		entity.EntryTypeSale,
-		quantity,
-		reference,
-		"confirmed",
-	)
+
+	var result *entity.StockEntry
+	var sentinel error // ErrStockNotInitialized / ErrInsufficientStock (sin writes → commit no-op)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		var availableQty float64
+		scanErr := tx.QueryRowContext(ctx, lockQuery, tenantID, variantSKU).Scan(&availableQty)
+		if scanErr == sql.ErrNoRows {
+			// Producto sin stock inicializado → no vendible. Sin writes: commit no-op.
+			sentinel = exception.ErrStockNotInitialized
+			return nil
+		}
+		if scanErr != nil {
+			return fmt.Errorf("failed to lock stock availability: %w", scanErr)
+		}
+
+		// 2. Validación en Go (no en DB, no en trigger)
+		if availableQty < quantity {
+			sentinel = fmt.Errorf("%w: available=%.2f, requested=%.2f",
+				exception.ErrInsufficientStock, availableQty, quantity)
+			return nil
+		}
+
+		// 3. Crear entidad de dominio
+		stockEntry, newErr := entity.NewStockEntry(
+			tenantID,
+			variantSKU,
+			entity.EntryTypeSale,
+			quantity,
+		)
+		if newErr != nil {
+			return fmt.Errorf("failed to create stock entry entity: %w", newErr)
+		}
+
+		stockEntry.SetReference(reference)
+		if confirmErr := stockEntry.Confirm(); confirmErr != nil {
+			return fmt.Errorf("failed to confirm stock entry: %w", confirmErr)
+		}
+
+		// 4. Persistir movimiento de venta
+		if _, execErr := tx.ExecContext(ctx, insertQuery,
+			stockEntry.ID,
+			tenantID,
+			variantSKU,
+			variantSKU, // Copiar a product_sku por compatibilidad
+			entity.EntryTypeSale,
+			quantity,
+			reference,
+			"confirmed",
+		); execErr != nil {
+			return fmt.Errorf("failed to insert stock entry: %w", execErr)
+		}
+
+		// 5. Recalcular stock_availability dentro de la misma TX
+		if recalcErr := r.recalcAvailability(ctx, tx, tenantID, variantSKU, stockEntry); recalcErr != nil {
+			return fmt.Errorf("failed to update availability: %w", recalcErr)
+		}
+
+		result = stockEntry
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert stock entry: %w", err)
+		return nil, err
+	}
+	if sentinel != nil {
+		return nil, sentinel
 	}
 
-	// 5. Recalcular stock_availability dentro de la misma TX
-	if err := r.recalcAvailability(ctx, tx, tenantID, variantSKU, stockEntry); err != nil {
-		return nil, fmt.Errorf("failed to update availability: %w", err)
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return stockEntry, nil
+	return result, nil
 }
 
 // CompensateSale revierte una venta creando un movimiento inverso
@@ -530,7 +586,13 @@ func (r *PostgresStockEntryRepository) recalcAvailability(ctx context.Context, e
 	return nil
 }
 
-// PostgresStockAvailabilityRepository implementación PostgreSQL
+// PostgresStockAvailabilityRepository implementación PostgreSQL.
+//
+// RLS (PLAT-E30, RULE-09/RULE-10): `stock_availability` tiene ROW LEVEL SECURITY forzado
+// con la policy `tenant_isolation` (migración 009). Cada operación corre dentro de
+// postgres.WithRLSInTransaction, que fija `app.tenant_id` con SET LOCAL — sin él, cualquier
+// query erra (fail-closed) bajo el rol NOBYPASSRLS `stock_app`. El filtro manual
+// `WHERE tenant_id = $` se mantiene como defensa en profundidad.
 type PostgresStockAvailabilityRepository struct {
 	db *sql.DB
 }
@@ -540,7 +602,8 @@ func NewPostgresStockAvailabilityRepository(db *sql.DB) port.StockAvailabilityRe
 	return &PostgresStockAvailabilityRepository{db: db}
 }
 
-// FindByTenantAndSKU busca disponibilidad por tenant y variant SKU (HITO 2.1)
+// FindByTenantAndSKU busca disponibilidad por tenant y variant SKU (HITO 2.1).
+// Tenant: tenantID param.
 func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Context, tenantID uuid.UUID, variantSKU string) (*entity.StockAvailability, error) {
 	query := `
 		SELECT id, tenant_id, variant_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -552,44 +615,54 @@ func (r *PostgresStockAvailabilityRepository) FindByTenantAndSKU(ctx context.Con
 		ORDER BY updated_at DESC
 		LIMIT 1
 	`
-	
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
 	availability := &entity.StockAvailability{}
-	
-	err := r.db.QueryRowContext(ctx, query, tenantID, variantSKU).Scan(
-		&availability.ID,
-		&availability.TenantID,
-		&availability.VariantSKU,
-		&availability.ProductID,
-		&availability.ProductName,
-		&availability.LocationID,
-		&availability.AvailableQuantity,
-		&availability.ReservedQuantity,
-		&availability.TotalQuantity,
-		&availability.UnitOfMeasure,
-		&availability.AvgUnitCost,
-		&availability.TotalValue,
-		&availability.MinStockLevel,
-		&availability.MaxStockLevel,
-		&availability.IsLowStock,
-		&availability.IsOutOfStock,
-		&availability.LastEntryAt,
-		&availability.UpdatedAt,
-	)
-	
-	// Mantener product_sku sincronizado
-	availability.ProductSKU = availability.VariantSKU
-	
-	if err == sql.ErrNoRows {
-		return nil, exception.ErrStockAvailabilityNotFound
-	}
+	var found bool
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		scanErr := tx.QueryRowContext(ctx, query, tenantID, variantSKU).Scan(
+			&availability.ID,
+			&availability.TenantID,
+			&availability.VariantSKU,
+			&availability.ProductID,
+			&availability.ProductName,
+			&availability.LocationID,
+			&availability.AvailableQuantity,
+			&availability.ReservedQuantity,
+			&availability.TotalQuantity,
+			&availability.UnitOfMeasure,
+			&availability.AvgUnitCost,
+			&availability.TotalValue,
+			&availability.MinStockLevel,
+			&availability.MaxStockLevel,
+			&availability.IsLowStock,
+			&availability.IsOutOfStock,
+			&availability.LastEntryAt,
+			&availability.UpdatedAt,
+		)
+		if scanErr == sql.ErrNoRows {
+			return nil
+		}
+		if scanErr != nil {
+			return scanErr
+		}
+		// Mantener product_sku sincronizado
+		availability.ProductSKU = availability.VariantSKU
+		found = true
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	
+	if !found {
+		return nil, exception.ErrStockAvailabilityNotFound
+	}
+
 	return availability, nil
 }
 
-// FindByTenant busca disponibilidad por tenant
+// FindByTenant busca disponibilidad por tenant. Tenant: tenantID param.
 func (r *PostgresStockAvailabilityRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*entity.StockAvailability, error) {
 	query := `
 		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -601,43 +674,54 @@ func (r *PostgresStockAvailabilityRepository) FindByTenant(ctx context.Context, 
 		ORDER BY product_sku
 		LIMIT $2 OFFSET $3
 	`
-	
-	rows, err := r.db.QueryContext(ctx, query, tenantID, limit, offset)
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	availabilities := make([]*entity.StockAvailability, 0)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		rows, queryErr := tx.QueryContext(ctx, query, tenantID, limit, offset)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			a := &entity.StockAvailability{}
+			if scanErr := rows.Scan(
+				&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
+				&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
+				&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
+				&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
+			); scanErr != nil {
+				return scanErr
+			}
+			availabilities = append(availabilities, a)
+		}
+		return rows.Err()
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	
-	availabilities := make([]*entity.StockAvailability, 0)
-	for rows.Next() {
-		a := &entity.StockAvailability{}
-		err := rows.Scan(
-			&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
-			&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
-			&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
-			&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		availabilities = append(availabilities, a)
-	}
-	
+
 	return availabilities, nil
 }
 
-// CountByTenant cuenta el total de registros de disponibilidad para un tenant
+// CountByTenant cuenta el total de registros de disponibilidad para un tenant. Tenant: tenantID param.
 func (r *PostgresStockAvailabilityRepository) CountByTenant(ctx context.Context, tenantID uuid.UUID) (int, error) {
 	query := `SELECT COUNT(*) FROM stock_availability WHERE tenant_id = $1`
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
 	var count int
-	err := r.db.QueryRowContext(ctx, query, tenantID).Scan(&count)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, query, tenantID).Scan(&count)
+	})
 	if err != nil {
 		return 0, err
 	}
 	return count, nil
 }
 
-// FindLowStock busca productos con bajo stock
+// FindLowStock busca productos con bajo stock. Tenant: tenantID param.
 func (r *PostgresStockAvailabilityRepository) FindLowStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error) {
 	query := `
 		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -648,32 +732,39 @@ func (r *PostgresStockAvailabilityRepository) FindLowStock(ctx context.Context, 
 		WHERE tenant_id = $1 AND is_low_stock = true
 		ORDER BY available_quantity ASC
 	`
-	
-	rows, err := r.db.QueryContext(ctx, query, tenantID)
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	availabilities := make([]*entity.StockAvailability, 0)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		rows, queryErr := tx.QueryContext(ctx, query, tenantID)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			a := &entity.StockAvailability{}
+			if scanErr := rows.Scan(
+				&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
+				&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
+				&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
+				&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
+			); scanErr != nil {
+				return scanErr
+			}
+			availabilities = append(availabilities, a)
+		}
+		return rows.Err()
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	
-	availabilities := make([]*entity.StockAvailability, 0)
-	for rows.Next() {
-		a := &entity.StockAvailability{}
-		err := rows.Scan(
-			&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
-			&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
-			&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
-			&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		availabilities = append(availabilities, a)
-	}
-	
+
 	return availabilities, nil
 }
 
-// FindOutOfStock busca productos sin stock
+// FindOutOfStock busca productos sin stock. Tenant: tenantID param.
 func (r *PostgresStockAvailabilityRepository) FindOutOfStock(ctx context.Context, tenantID uuid.UUID) ([]*entity.StockAvailability, error) {
 	query := `
 		SELECT id, tenant_id, product_sku, product_id, COALESCE(product_name, ''), location_id,
@@ -684,32 +775,39 @@ func (r *PostgresStockAvailabilityRepository) FindOutOfStock(ctx context.Context
 		WHERE tenant_id = $1 AND is_out_of_stock = true
 		ORDER BY product_sku
 	`
-	
-	rows, err := r.db.QueryContext(ctx, query, tenantID)
+
+	rc := postgres.RLSContext{TenantID: tenantID.String()}
+	availabilities := make([]*entity.StockAvailability, 0)
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		rows, queryErr := tx.QueryContext(ctx, query, tenantID)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			a := &entity.StockAvailability{}
+			if scanErr := rows.Scan(
+				&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
+				&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
+				&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
+				&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
+			); scanErr != nil {
+				return scanErr
+			}
+			availabilities = append(availabilities, a)
+		}
+		return rows.Err()
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	
-	availabilities := make([]*entity.StockAvailability, 0)
-	for rows.Next() {
-		a := &entity.StockAvailability{}
-		err := rows.Scan(
-			&a.ID, &a.TenantID, &a.ProductSKU, &a.ProductID, &a.ProductName, &a.LocationID,
-			&a.AvailableQuantity, &a.ReservedQuantity, &a.TotalQuantity, &a.UnitOfMeasure,
-			&a.AvgUnitCost, &a.TotalValue, &a.MinStockLevel, &a.MaxStockLevel,
-			&a.IsLowStock, &a.IsOutOfStock, &a.LastEntryAt, &a.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		availabilities = append(availabilities, a)
-	}
-	
+
 	return availabilities, nil
 }
 
-// Save guarda o actualiza disponibilidad
+// Save guarda o actualiza disponibilidad. Tenant: availability.TenantID (path del WITH CHECK).
 func (r *PostgresStockAvailabilityRepository) Save(ctx context.Context, availability *entity.StockAvailability) error {
 	query := `
 		INSERT INTO stock_availability (
@@ -729,21 +827,23 @@ func (r *PostgresStockAvailabilityRepository) Save(ctx context.Context, availabi
 			is_out_of_stock = EXCLUDED.is_out_of_stock,
 			updated_at = EXCLUDED.updated_at
 	`
-	
-	_, err := r.db.ExecContext(ctx, query,
-		availability.ID, availability.TenantID, availability.ProductSKU,
-		availability.ProductID, availability.ProductName, availability.LocationID,
-		availability.AvailableQuantity, availability.ReservedQuantity, availability.TotalQuantity,
-		availability.UnitOfMeasure, availability.AvgUnitCost, availability.TotalValue,
-		availability.MinStockLevel, availability.MaxStockLevel,
-		availability.IsLowStock, availability.IsOutOfStock,
-		availability.LastEntryAt, availability.UpdatedAt,
-	)
-	
-	return err
+
+	rc := postgres.RLSContext{TenantID: availability.TenantID.String()}
+	return postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, query,
+			availability.ID, availability.TenantID, availability.ProductSKU,
+			availability.ProductID, availability.ProductName, availability.LocationID,
+			availability.AvailableQuantity, availability.ReservedQuantity, availability.TotalQuantity,
+			availability.UnitOfMeasure, availability.AvgUnitCost, availability.TotalValue,
+			availability.MinStockLevel, availability.MaxStockLevel,
+			availability.IsLowStock, availability.IsOutOfStock,
+			availability.LastEntryAt, availability.UpdatedAt,
+		)
+		return err
+	})
 }
 
-// Update actualiza disponibilidad existente
+// Update actualiza disponibilidad existente. Tenant: availability.TenantID (path del WITH CHECK).
 func (r *PostgresStockAvailabilityRepository) Update(ctx context.Context, availability *entity.StockAvailability) error {
 	query := `
 		UPDATE stock_availability SET
@@ -757,22 +857,32 @@ func (r *PostgresStockAvailabilityRepository) Update(ctx context.Context, availa
 			updated_at = $8
 		WHERE id = $9 AND tenant_id = $10
 	`
-	
-	result, err := r.db.ExecContext(ctx, query,
-		availability.AvailableQuantity, availability.ReservedQuantity, availability.TotalQuantity,
-		availability.AvgUnitCost, availability.TotalValue,
-		availability.IsLowStock, availability.IsOutOfStock, availability.UpdatedAt,
-		availability.ID, availability.TenantID,
-	)
+
+	rc := postgres.RLSContext{TenantID: availability.TenantID.String()}
+	var rows int64
+	err := postgres.WithRLSInTransaction(ctx, r.db, rc, func(ctx context.Context, tx *sql.Tx) error {
+		result, execErr := tx.ExecContext(ctx, query,
+			availability.AvailableQuantity, availability.ReservedQuantity, availability.TotalQuantity,
+			availability.AvgUnitCost, availability.TotalValue,
+			availability.IsLowStock, availability.IsOutOfStock, availability.UpdatedAt,
+			availability.ID, availability.TenantID,
+		)
+		if execErr != nil {
+			return execErr
+		}
+		ra, _ := result.RowsAffected()
+		rows = ra
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}
-	
-	rows, _ := result.RowsAffected()
+
 	if rows == 0 {
 		return exception.ErrStockAvailabilityNotFound
 	}
-	
+
 	return nil
 }
 

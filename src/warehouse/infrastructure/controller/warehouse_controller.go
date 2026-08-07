@@ -68,13 +68,15 @@ func (c *WarehouseController) RegisterRoutes(router *gin.RouterGroup) {
 func (c *WarehouseController) CreateWarehouse(ctx *gin.Context) {
 	var req request.CreateWarehouseRequest
 
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
-	req.TenantID = tenantID.(string)
+	req.TenantID = tenantID
 
 	// Parsear el cuerpo de la petición
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -102,16 +104,13 @@ func (c *WarehouseController) CreateWarehouse(ctx *gin.Context) {
 
 // ListWarehouses maneja la petición para listar almacenes con filtros y paginación
 func (c *WarehouseController) ListWarehouses(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Agregar tenant_id a los query parameters para el filtrado
@@ -138,10 +137,12 @@ func (c *WarehouseController) ListWarehouses(ctx *gin.Context) {
 
 // GetWarehouse maneja la petición para obtener un almacén por su ID
 func (c *WarehouseController) GetWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -153,7 +154,7 @@ func (c *WarehouseController) GetWarehouse(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para obtener un almacén
-	response, err := c.getWarehouseUseCase.Execute(ctx, tenantID.(string), warehouseID)
+	response, err := c.getWarehouseUseCase.Execute(ctx, tenantID, warehouseID)
 
 	// Manejar errores
 	if err != nil {
@@ -172,10 +173,12 @@ func (c *WarehouseController) GetWarehouse(ctx *gin.Context) {
 
 // UpdateWarehouse maneja la petición para actualizar un almacén
 func (c *WarehouseController) UpdateWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -194,7 +197,7 @@ func (c *WarehouseController) UpdateWarehouse(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para actualizar un almacén
-	response, err := c.updateWarehouseUseCase.Execute(ctx, tenantID.(string), warehouseID, req)
+	response, err := c.updateWarehouseUseCase.Execute(ctx, tenantID, warehouseID, req)
 
 	// Manejar errores
 	if err != nil {
@@ -213,16 +216,13 @@ func (c *WarehouseController) UpdateWarehouse(ctx *gin.Context) {
 
 // ListWarehousesByLocation maneja la petición para listar almacenes por ubicación
 func (c *WarehouseController) ListWarehousesByLocation(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Obtener el ID de la ubicación de los parámetros de la URL
@@ -256,10 +256,12 @@ func (c *WarehouseController) ListWarehousesByLocation(ctx *gin.Context) {
 
 // ActivateWarehouse maneja la petición para activar un almacén
 func (c *WarehouseController) ActivateWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -271,7 +273,7 @@ func (c *WarehouseController) ActivateWarehouse(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para activar un almacén
-	response, err := c.activateWarehouseUseCase.Execute(ctx, tenantID.(string), warehouseID)
+	response, err := c.activateWarehouseUseCase.Execute(ctx, tenantID, warehouseID)
 
 	// Manejar errores
 	if err != nil {
@@ -290,10 +292,12 @@ func (c *WarehouseController) ActivateWarehouse(ctx *gin.Context) {
 
 // DeactivateWarehouse maneja la petición para desactivar un almacén
 func (c *WarehouseController) DeactivateWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -305,7 +309,7 @@ func (c *WarehouseController) DeactivateWarehouse(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para desactivar un almacén
-	response, err := c.deactivateWarehouseUseCase.Execute(ctx, tenantID.(string), warehouseID)
+	response, err := c.deactivateWarehouseUseCase.Execute(ctx, tenantID, warehouseID)
 
 	// Manejar errores
 	if err != nil {
@@ -324,10 +328,12 @@ func (c *WarehouseController) DeactivateWarehouse(ctx *gin.Context) {
 
 // DeleteWarehouse maneja la petición para eliminar un almacén
 func (c *WarehouseController) DeleteWarehouse(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -339,7 +345,7 @@ func (c *WarehouseController) DeleteWarehouse(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para eliminar un almacén
-	err := c.deleteWarehouseUseCase.Execute(ctx, tenantID.(string), warehouseID)
+	err := c.deleteWarehouseUseCase.Execute(ctx, tenantID, warehouseID)
 
 	// Manejar errores
 	if err != nil {

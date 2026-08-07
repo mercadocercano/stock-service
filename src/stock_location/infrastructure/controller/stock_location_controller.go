@@ -72,13 +72,15 @@ func (c *StockLocationController) RegisterRoutes(router *gin.RouterGroup) {
 func (c *StockLocationController) CreateStockLocation(ctx *gin.Context) {
 	var req request.CreateStockLocationRequest
 
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
-	req.TenantID = tenantID.(string)
+	req.TenantID = tenantID
 
 	// Parsear el cuerpo de la petición
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -106,16 +108,13 @@ func (c *StockLocationController) CreateStockLocation(ctx *gin.Context) {
 
 // ListStockLocations maneja la petición para listar ubicaciones de stock con filtros y paginación
 func (c *StockLocationController) ListStockLocations(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Agregar tenant_id a los query parameters para el filtrado
@@ -142,10 +141,12 @@ func (c *StockLocationController) ListStockLocations(ctx *gin.Context) {
 
 // GetStockLocation maneja la petición para obtener una ubicación de stock por su ID
 func (c *StockLocationController) GetStockLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -157,7 +158,7 @@ func (c *StockLocationController) GetStockLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para obtener una ubicación de stock
-	response, err := c.getStockLocationUseCase.Execute(ctx, tenantID.(string), stockLocationID)
+	response, err := c.getStockLocationUseCase.Execute(ctx, tenantID, stockLocationID)
 
 	// Manejar errores
 	if err != nil {
@@ -176,10 +177,12 @@ func (c *StockLocationController) GetStockLocation(ctx *gin.Context) {
 
 // UpdateStockLocation maneja la petición para actualizar una ubicación de stock
 func (c *StockLocationController) UpdateStockLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -198,7 +201,7 @@ func (c *StockLocationController) UpdateStockLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para actualizar una ubicación de stock
-	response, err := c.updateStockLocationUseCase.Execute(ctx, tenantID.(string), stockLocationID, req)
+	response, err := c.updateStockLocationUseCase.Execute(ctx, tenantID, stockLocationID, req)
 
 	// Manejar errores
 	if err != nil {
@@ -217,10 +220,12 @@ func (c *StockLocationController) UpdateStockLocation(ctx *gin.Context) {
 
 // ActivateStockLocation maneja la petición para activar una ubicación de stock
 func (c *StockLocationController) ActivateStockLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -232,7 +237,7 @@ func (c *StockLocationController) ActivateStockLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para activar una ubicación de stock
-	response, err := c.activateStockLocationUseCase.Execute(ctx, tenantID.(string), stockLocationID)
+	response, err := c.activateStockLocationUseCase.Execute(ctx, tenantID, stockLocationID)
 
 	// Manejar errores
 	if err != nil {
@@ -251,10 +256,12 @@ func (c *StockLocationController) ActivateStockLocation(ctx *gin.Context) {
 
 // DeactivateStockLocation maneja la petición para desactivar una ubicación de stock
 func (c *StockLocationController) DeactivateStockLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -266,7 +273,7 @@ func (c *StockLocationController) DeactivateStockLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para desactivar una ubicación de stock
-	response, err := c.deactivateStockLocationUseCase.Execute(ctx, tenantID.(string), stockLocationID)
+	response, err := c.deactivateStockLocationUseCase.Execute(ctx, tenantID, stockLocationID)
 
 	// Manejar errores
 	if err != nil {
@@ -285,10 +292,12 @@ func (c *StockLocationController) DeactivateStockLocation(ctx *gin.Context) {
 
 // DeleteStockLocation maneja la petición para eliminar una ubicación de stock
 func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -300,7 +309,7 @@ func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para eliminar una ubicación de stock
-	err := c.deleteStockLocationUseCase.Execute(ctx, tenantID.(string), stockLocationID)
+	err := c.deleteStockLocationUseCase.Execute(ctx, tenantID, stockLocationID)
 
 	// Manejar errores
 	if err != nil {
@@ -319,16 +328,13 @@ func (c *StockLocationController) DeleteStockLocation(ctx *gin.Context) {
 
 // ListStockLocationsByWarehouse maneja la petición para listar ubicaciones de stock por almacén
 func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Obtener el ID del almacén de los parámetros de la URL
@@ -362,16 +368,13 @@ func (c *StockLocationController) ListStockLocationsByWarehouse(ctx *gin.Context
 
 // ListRootStockLocations maneja la petición para listar ubicaciones de stock raíz por almacén
 func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Obtener el ID del almacén de los parámetros de la URL
@@ -405,16 +408,13 @@ func (c *StockLocationController) ListRootStockLocations(ctx *gin.Context) {
 
 // ListChildrenStockLocations maneja la petición para listar ubicaciones de stock hijas
 func (c *StockLocationController) ListChildrenStockLocations(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Obtener el ID de la ubicación padre de los parámetros de la URL

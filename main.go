@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof" // registra /debug/pprof/* en http.DefaultServeMux (ver startDebugServer)
@@ -92,11 +93,21 @@ func main() {
 	gzipSharedCfg := sharedConfig.DefaultSharedConfig()
 	sharedConfig.SetupSharedMiddleware(router, gzipSharedCfg)
 
-	// Obtener configuración de la base de datos de variables de entorno
+	// Obtener configuración de la base de datos de variables de entorno.
+	// Sin default inseguro (PLAT-E30 T-STK6, C1 CRÍTICO @dev-security, patrón E27/E28/E29): el
+	// viejo default "postgres" es superuser → BYPASSRLS. Con él, el servicio arrancaba SIN error
+	// con la RLS de locations/warehouses/stock_locations/stock_entries/stock_availability
+	// "activa" pero nunca ejercida (FORCE ROW LEVEL SECURITY no aplica a superusers), sirviendo
+	// stock cross-tenant. DB_USER es obligatorio y debe ser un rol NOBYPASSRLS (stock_app). El
+	// chequeo de rol vivo se hace en assertNoRLSBypass.
 	dbHost := env.Get("DB_HOST", "localhost")
 	dbPort := env.Get("DB_PORT", "5432")
-	dbUser := env.Get("DB_USER", "postgres")
-	dbPassword := env.Get("DB_PASSWORD", "postgres")
+	dbUser := env.Get("DB_USER", "")
+	if dbUser == "" {
+		log.Fatalf("DB_USER is required and must be a NOBYPASSRLS application role " +
+			"(e.g. stock_app), never postgres — RULE-09/RULE-10, PLAT-E30 C1")
+	}
+	dbPassword := env.Get("DB_PASSWORD", "")
 	dbName := env.Get("DB_NAME", "stock_db")
 
 	// Conectar a la base de datos usando el helper compartido
@@ -115,6 +126,23 @@ func main() {
 	defer db.Close()
 	goshpostgres.StartPoolMonitor(context.Background(), db, goshpostgres.MonitorOptions{Service: "stock-service", DBName: dbName})
 	log.Println("Conexión a la base de datos establecida con éxito")
+
+	// Fail-fast anti-superuser (PLAT-E30 T-STK6, C1 CRÍTICO @dev-security, patrón E27/E28/E29):
+	// el runtime NUNCA debe correr como superuser/BYPASSRLS. FORCE ROW LEVEL SECURITY no aplica
+	// a superusers → con un rol privilegiado la RLS de locations/warehouses/stock_locations/
+	// stock_entries/stock_availability queda "activa" pero nunca ejercida, sirviendo stock
+	// cross-tenant sin error visible. Convierte ese fail-OPEN silencioso en un fail-CLOSED
+	// ruidoso. Se corre ANTES de servir tráfico y antes de RunMigrations.
+	//
+	// Consecuencia operativa del flip (registrada con el sign-off de T-STK3): stock_app no tiene
+	// DDL ni escritura sobre schema_migrations, así que una migración PENDIENTE termina en
+	// Fatalf abajo y el proceso no arranca. En estado estacionario golang-migrate v4.19.1
+	// retorna temprano si schema_migrations existe (hoy v10/dirty=f), así que el reinicio normal
+	// no se ve afectado. Toda migración nueva se aplica out-of-band como postgres ANTES de
+	// desplegar.
+	if err := assertNoRLSBypass(db); err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	// Migraciones versionadas in-app (ADR-001) — fail-fast antes de servir tráfico.
 	if err := sharedmigrate.RunMigrations(db, MigrationsFS, dbName); err != nil {
@@ -225,3 +253,38 @@ func setupStockEntryModule(router *gin.RouterGroup, db *sql.DB) {
 }
 
 // Test change for git hook
+
+// assertNoRLSBypass aborta el arranque si el rol de base de datos con el que conectamos es
+// superuser o tiene el atributo BYPASSRLS (PLAT-E30 T-STK6, C1 CRÍTICO @dev-security). Con un rol
+// así, FORCE ROW LEVEL SECURITY no se aplica y la RLS de locations, warehouses, stock_locations,
+// stock_entries y stock_availability (inventario y disponibilidad por tenant) queda inerte: el
+// servicio serviría stock cross-tenant sin ningún error visible. Convierte ese fail-OPEN
+// silencioso en un fail-CLOSED ruidoso. Stock tiene una sola conexión (stock_db) — a diferencia de
+// tenant-service (E29) no publica eventos, sin segunda conexión que proteger. El criterio "Hecho
+// cuando" exige verificar `SELECT current_user` desde el proceso vivo (C1): este guard lo emite
+// por log, pero la conformidad real se confirma consultando current_user desde el binario
+// arrancado, no leyendo el log. ALLOW_SUPERUSER_DB=true es un escape hatch explícito para tareas
+// admin locales — jamás debe usarse en producción.
+func assertNoRLSBypass(db *sql.DB) error {
+	if env.Get("ALLOW_SUPERUSER_DB", "false") == "true" {
+		log.Println("⚠️  ALLOW_SUPERUSER_DB=true — se omite el chequeo NOBYPASSRLS (solo admin/local, NUNCA prod)")
+		return nil
+	}
+
+	var privileged bool
+	if err := db.QueryRow(
+		`SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user`,
+	).Scan(&privileged); err != nil {
+		return fmt.Errorf("no se pudo verificar los privilegios del rol de DB (current_user): %w", err)
+	}
+	if privileged {
+		return fmt.Errorf("negativa a arrancar: el rol de DB actual es SUPERUSER o BYPASSRLS y " +
+			"eludiría la row-level security de locations/warehouses/stock_locations/" +
+			"stock_entries/stock_availability (stock por tenant — RULE-09/RULE-10, PLAT-E30 C1). " +
+			"Usá un rol NOBYPASSRLS como stock_app, o exportá ALLOW_SUPERUSER_DB=true solo para " +
+			"tareas admin locales")
+	}
+
+	log.Println("RLS guard OK: el rol de DB es NOBYPASSRLS (locations, warehouses, stock_locations, stock_entries y stock_availability protegidas por FORCE ROW LEVEL SECURITY)")
+	return nil
+}

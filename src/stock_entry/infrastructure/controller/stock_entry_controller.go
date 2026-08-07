@@ -57,9 +57,12 @@ func NewStockEntryController(
 
 // CreateStockEntry maneja la creación de una entrada de stock
 func (ctrl *StockEntryController) CreateStockEntry(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -82,9 +85,12 @@ func (ctrl *StockEntryController) CreateStockEntry(c *gin.Context) {
 
 // BulkCreateStockEntries maneja la creación masiva de entradas
 func (ctrl *StockEntryController) BulkCreateStockEntries(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -112,9 +118,12 @@ func (ctrl *StockEntryController) BulkCreateStockEntries(c *gin.Context) {
 
 // GetAvailability consulta la disponibilidad de un producto (por SKU) o lista toda la disponibilidad del tenant
 func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -144,9 +153,12 @@ func (ctrl *StockEntryController) GetAvailability(c *gin.Context) {
 
 // ReserveStock maneja la reserva de stock
 func (ctrl *StockEntryController) ReserveStock(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -172,9 +184,12 @@ func (ctrl *StockEntryController) ReserveStock(c *gin.Context) {
 
 // ReleaseStock maneja la liberación de stock reservado
 func (ctrl *StockEntryController) ReleaseStock(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -234,9 +249,12 @@ func (ctrl *StockEntryController) RegisterRoutes(router *gin.RouterGroup) {
 // CompensateSale maneja la compensación (reversión) de una venta
 // HITO D: Usado para rollback cuando falla persistencia de orden
 func (ctrl *StockEntryController) CompensateSale(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -257,9 +275,12 @@ func (ctrl *StockEntryController) CompensateSale(c *gin.Context) {
 
 // RevertConsume maneja la reversión de un consumo de stock (cancelación de orden)
 func (ctrl *StockEntryController) RevertConsume(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -280,9 +301,12 @@ func (ctrl *StockEntryController) RevertConsume(c *gin.Context) {
 
 // ConsumeStock maneja el consumo de stock reservado (confirmación de orden)
 func (ctrl *StockEntryController) ConsumeStock(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -308,9 +332,12 @@ func (ctrl *StockEntryController) ConsumeStock(c *gin.Context) {
 
 // ProcessSale maneja el procesamiento de una venta (minimal mock)
 func (ctrl *StockEntryController) ProcessSale(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -337,9 +364,12 @@ func (ctrl *StockEntryController) ProcessSale(c *gin.Context) {
 
 // ListSales lista las ventas POS recientes
 func (ctrl *StockEntryController) ListSales(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := c.GetString("tenant_id")
 	if tenantID == "" {
-		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header is required")
+		httpresp.JSON(c, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 

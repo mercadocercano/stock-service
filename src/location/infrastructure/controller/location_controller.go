@@ -64,13 +64,15 @@ func (c *LocationController) RegisterRoutes(router *gin.RouterGroup) {
 func (c *LocationController) CreateLocation(ctx *gin.Context) {
 	var req request.CreateLocationRequest
 
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
-	req.TenantID = tenantID.(string)
+	req.TenantID = tenantID
 
 	// Parsear el cuerpo de la petición
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -98,16 +100,13 @@ func (c *LocationController) CreateLocation(ctx *gin.Context) {
 
 // ListLocations maneja la petición para listar ubicaciones con filtros y paginación
 func (c *LocationController) ListLocations(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Agregar tenant_id a los query parameters para el filtrado
@@ -134,10 +133,12 @@ func (c *LocationController) ListLocations(ctx *gin.Context) {
 
 // GetLocation maneja la petición para obtener una ubicación por su ID
 func (c *LocationController) GetLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -149,7 +150,7 @@ func (c *LocationController) GetLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para obtener una ubicación
-	response, err := c.getLocationUseCase.Execute(ctx, tenantID.(string), locationID)
+	response, err := c.getLocationUseCase.Execute(ctx, tenantID, locationID)
 
 	// Manejar errores
 	if err != nil {
@@ -168,10 +169,12 @@ func (c *LocationController) GetLocation(ctx *gin.Context) {
 
 // UpdateLocation maneja la petición para actualizar una ubicación
 func (c *LocationController) UpdateLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -190,7 +193,7 @@ func (c *LocationController) UpdateLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para actualizar una ubicación
-	response, err := c.updateLocationUseCase.Execute(ctx, tenantID.(string), locationID, req)
+	response, err := c.updateLocationUseCase.Execute(ctx, tenantID, locationID, req)
 
 	// Manejar errores
 	if err != nil {
@@ -209,10 +212,12 @@ func (c *LocationController) UpdateLocation(ctx *gin.Context) {
 
 // ActivateLocation maneja la petición para activar una ubicación
 func (c *LocationController) ActivateLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -224,7 +229,7 @@ func (c *LocationController) ActivateLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para activar una ubicación
-	response, err := c.activateLocationUseCase.Execute(ctx, tenantID.(string), locationID)
+	response, err := c.activateLocationUseCase.Execute(ctx, tenantID, locationID)
 
 	// Manejar errores
 	if err != nil {
@@ -243,10 +248,12 @@ func (c *LocationController) ActivateLocation(ctx *gin.Context) {
 
 // DeactivateLocation maneja la petición para desactivar una ubicación
 func (c *LocationController) DeactivateLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -258,7 +265,7 @@ func (c *LocationController) DeactivateLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para desactivar una ubicación
-	response, err := c.deactivateLocationUseCase.Execute(ctx, tenantID.(string), locationID)
+	response, err := c.deactivateLocationUseCase.Execute(ctx, tenantID, locationID)
 
 	// Manejar errores
 	if err != nil {
@@ -277,10 +284,12 @@ func (c *LocationController) DeactivateLocation(ctx *gin.Context) {
 
 // DeleteLocation maneja la petición para eliminar una ubicación
 func (c *LocationController) DeleteLocation(ctx *gin.Context) {
-	// Obtener el tenant ID del contexto
-	tenantID, exists := ctx.Get("tenantID")
-	if !exists {
-		httpresp.JSON(ctx, http.StatusBadRequest, "Tenant ID is required")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
+	if tenantID == "" {
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
 		return
 	}
 
@@ -292,7 +301,7 @@ func (c *LocationController) DeleteLocation(ctx *gin.Context) {
 	}
 
 	// Ejecutar el caso de uso para eliminar una ubicación
-	err := c.deleteLocationUseCase.Execute(ctx, tenantID.(string), locationID)
+	err := c.deleteLocationUseCase.Execute(ctx, tenantID, locationID)
 
 	// Manejar errores
 	if err != nil {
@@ -311,16 +320,13 @@ func (c *LocationController) DeleteLocation(ctx *gin.Context) {
 
 // ListStores maneja la petición para listar solo ubicaciones de tipo tienda
 func (c *LocationController) ListStores(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Agregar tenant_id a los query parameters para el filtrado
@@ -350,16 +356,13 @@ func (c *LocationController) ListStores(ctx *gin.Context) {
 
 // ListDistributionCenters maneja la petición para listar solo centros de distribución
 func (c *LocationController) ListDistributionCenters(ctx *gin.Context) {
-	// Obtener el tenantID del header y agregarlo a los query parameters
-	tenantID := ctx.GetHeader("X-Tenant-ID")
+	// tenant_id SIEMPRE del claim JWT verificado por tenantmw.TenantValidation (PLAT-E30 D1,
+	// patrón E29 tenant-service) — nunca del header X-Tenant-ID crudo. Fail-closed 401: si el
+	// claim no está en el contexto, RejectMissingTenant (main.go:75) ya abortó antes.
+	tenantID := ctx.GetString("tenant_id")
 	if tenantID == "" {
-		// Fallback: intentar obtener del contexto (middleware)
-		if tenant, exists := ctx.Get("tenantID"); exists {
-			tenantID = tenant.(string)
-		} else {
-			httpresp.JSON(ctx, http.StatusBadRequest, "X-Tenant-ID header es requerido")
-			return
-		}
+		httpresp.JSON(ctx, http.StatusUnauthorized, "tenant_id missing from request context")
+		return
 	}
 
 	// Agregar tenant_id a los query parameters para el filtrado
