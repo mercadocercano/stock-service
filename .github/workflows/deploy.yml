@@ -1,8 +1,22 @@
 name: Deploy stock-service to Production
 
+# ⚠️ DEPLOY AUTOMÁTICO DESACTIVADO — decisión del owner, 2026-08-07.
+#
+# El droplet de DigitalOcean está APAGADO, así que este workflow fallaría en el paso de SSH
+# (`ssh deploy@${{ secrets.DROPLET_IP }}`). El despliegue se retoma en el hito PLAT-H2
+# (migración a k3s: local con minikube/k3d → producción), con su propio destino y sus manifiestos.
+#
+# Por eso se quitó el trigger `push: branches: [master]`: un push a master ya no despliega nada.
+# Queda `workflow_dispatch` para poder correrlo a mano el día que haya adónde desplegar.
+#
+# ⚠️ ANTES de reactivarlo, PLAT-E30 (Retrofit RLS fail-closed) exige tres pasos en el destino:
+#   1. crear el rol `stock_app` NOBYPASSRLS en la base de producción;
+#   2. setear `DB_USER`/`DB_PASSWORD` en el deployment (el binario ya NO tiene default y hace
+#      `Fatalf` si el rol es superusuario o si `DB_USER` viene vacío);
+#   3. aplicar las migraciones `009_rls_stock` y `010_normalize_tenant_id_uuid` out-of-band como
+#      `postgres` — `stock_app` no tiene DDL y el arranque muere si quedan pendientes.
+# Sin esos tres pasos, el pod queda en CrashLoopBackOff.
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 env:
